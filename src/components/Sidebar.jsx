@@ -103,6 +103,20 @@ export default function Sidebar() {
           ชุมนุม
         </Link>
 
+         {/* Clubs */}
+        <Link
+          to="/attendance/scan"
+          className="flex items-center gap-3 p-3 rounded hover:bg-primary-600 transition"
+        >
+          <Users size={18} />
+          OI
+        </Link>
+
+
+
+
+
+
       </nav>
 
       {/* Footer */}

@@ -25,5 +25,18 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null && request.auth.token.role == 'admin';
     }
+    match /attendance_sessions/{sessionId} {
+      allow read: if request.auth != null;
+      // only instructors or admins should create sessions; for now check that auth is present
+      allow create: if request.auth != null && (request.auth.token.role == 'instructor' || request.auth.token.role == 'admin');
+      allow update: if request.auth != null && (request.auth.token.role == 'instructor' || request.auth.token.role == 'admin');
+    }
+    
+    match /attendance_records/{recordId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // allow read for instructor/admin or the owner
+      allow read: if request.auth != null && (request.auth.token.role in ['instructor','admin'] || request.auth.uid == resource.data.userId);
+    }
+
   }
 }

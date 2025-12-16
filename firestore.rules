@@ -1,42 +1,32 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ===== Users collection =====
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      // ผู้ใช้ที่ login แล้ว อ่าน/เขียนข้อมูล "ของตัวเอง" ได้
+      allow read, write: if request.auth != null
+                          && request.auth.uid == userId;
     }
 
-    match /clubs/{clubId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (request.auth.uid == resource.data.ownerId || request.auth.token.role == 'admin');
-      match /members/{memberId} {
-        allow read: if true;
-        allow write: if request.auth != null && request.auth.uid == memberId;
-      }
-    }
-
-    match /attendance/{courseId}/sessions/{sessionId}/records/{uid} {
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow read: if request.auth != null && (request.auth.token.role in ['instructor','admin'] || request.auth.uid == uid);
-    }
-
-    match /systemStatus/{doc} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.role == 'admin';
-    }
+    // ===== Attendance Sessions (อาจารย์) =====
     match /attendance_sessions/{sessionId} {
       allow read: if request.auth != null;
-      // only instructors or admins should create sessions; for now check that auth is present
-      allow create: if request.auth != null && (request.auth.token.role == 'instructor' || request.auth.token.role == 'admin');
-      allow update: if request.auth != null && (request.auth.token.role == 'instructor' || request.auth.token.role == 'admin');
-    }
-    
-    match /attendance_records/{recordId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      // allow read for instructor/admin or the owner
-      allow read: if request.auth != null && (request.auth.token.role in ['instructor','admin'] || request.auth.uid == resource.data.userId);
+      allow write: if request.auth != null
+                   && get(/databases/$(database)/documents/users/$(request.auth.uid))
+                        .data.role == 'instructor';
     }
 
+    // ===== Attendance Records (นักเรียน) =====
+    match /attendance_records/{recordId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ===== Clubs =====
+    match /clubs/{clubId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
   }
 }

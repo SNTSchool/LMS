@@ -4,10 +4,12 @@ import {
   GraduationCap,
   LayoutDashboard,
   Users,
+  ClipboardList,
   QrCode,
   ScanLine,
-  LogOut,
-  Shield
+  FileSpreadsheet,
+  Shield,
+  LogOut
 } from 'lucide-react'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebaseConfig'
@@ -18,9 +20,8 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const { userData, loading } = useAuth()
 
-  // ระหว่างโหลด userData ห้าม render sidebar
-  if (loading) return null
-  if (!userData) return null
+  // ระหว่างโหลด auth / role → ไม่ render sidebar
+  if (loading || !userData) return null
 
   const role = userData.role?.toLowerCase()
 
@@ -40,8 +41,18 @@ export default function Sidebar() {
     }
   }
 
+  const NavItem = ({ to, icon: Icon, label }) => (
+    <Link
+      to={to}
+      className="flex items-center gap-3 px-3 py-2 rounded hover:bg-primary-600 transition"
+    >
+      <Icon size={18} />
+      <span>{label}</span>
+    </Link>
+  )
+
   return (
-    <aside className="w-64 bg-primary-700 text-white fixed h-full p-6 hidden md:flex flex-col">
+    <aside className="w-64 bg-primary-700 text-white fixed inset-y-0 left-0 p-5 hidden md:flex flex-col">
 
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8">
@@ -56,48 +67,91 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 text-sm">
 
-        {/* Dashboard */}
+        {/* ===== Dashboard ===== */}
         {role === 'student' && (
-          <Link to="/" className="nav-item">
-            <LayoutDashboard size={18} />
-            หน้าหลักนักเรียน
-          </Link>
+          <NavItem
+            to="/"
+            icon={LayoutDashboard}
+            label="แดชบอร์ดนักเรียน"
+          />
         )}
 
         {role === 'instructor' && (
-          <Link to="/instructor" className="nav-item">
-            <LayoutDashboard size={18} />
-            หน้าหลักอาจารย์
-          </Link>
+          <NavItem
+            to="/instructor"
+            icon={LayoutDashboard}
+            label="แดชบอร์ดอาจารย์"
+          />
         )}
 
-        {/* Classes */}
-        <Link to="/classes" className="nav-item">
-          <Users size={18} />
-          ห้องเรียน
-        </Link>
+        {/* ===== Classroom ===== */}
+        <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
+          Classroom
+        </div>
 
-        {/* Attendance */}
+        <NavItem
+          to="/classes"
+          icon={Users}
+          label="ห้องเรียน"
+        />
+
+        {/* ===== Assignment ===== */}
+        <NavItem
+          to="/assignments"
+          icon={ClipboardList}
+          label="งานที่มอบหมาย"
+        />
+
+        {/* ===== Attendance ===== */}
+        <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
+          Attendance
+        </div>
+
         {role === 'student' && (
-          <Link to="/attendance/scan" className="nav-item">
-            <ScanLine size={18} />
-            สแกนเช็คชื่อ
-          </Link>
+          <NavItem
+            to="/attendance/scan"
+            icon={ScanLine}
+            label="สแกนเช็คชื่อ"
+          />
         )}
 
-        {role === 'instructor' && (
-          <Link to="/attendance/create" className="nav-item">
-            <QrCode size={18} />
-            สร้าง QR เช็คชื่อ
-          </Link>
+        {(role === 'instructor' || role === 'admin') && (
+          <NavItem
+            to="/attendance/create"
+            icon={QrCode}
+            label="สร้าง QR เช็คชื่อ"
+          />
         )}
 
-        {/* Admin */}
+        {/* ===== Duty / Reports ===== */}
+        <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
+          Reports
+        </div>
+
+        <NavItem
+          to="/duty-reports"
+          icon={ClipboardList}
+          label="รายงานเวร"
+        />
+
+        <NavItem
+          to="/reports"
+          icon={FileSpreadsheet}
+          label="รายงาน & Export"
+        />
+
+        {/* ===== Admin ===== */}
         {role === 'admin' && (
-          <Link to="/admin" className="nav-item">
-            <Shield size={18} />
-            Admin Dashboard
-          </Link>
+          <>
+            <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
+              Admin
+            </div>
+            <NavItem
+              to="/admin"
+              icon={Shield}
+              label="Admin Dashboard"
+            />
+          </>
         )}
       </nav>
 
@@ -105,7 +159,7 @@ export default function Sidebar() {
       <div className="pt-4 border-t border-white/20">
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 p-3 rounded bg-white/10 hover:bg-white/20 transition"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded bg-white/10 hover:bg-white/20 transition"
         >
           <LogOut size={18} />
           ออกจากระบบ

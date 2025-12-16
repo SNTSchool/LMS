@@ -1,36 +1,38 @@
 // src/services/attendanceService.js
-import { addDoc, collection, doc, getDoc, serverTimestamp, query, where, getDocs, updateDoc } from "firebase/firestore";
+import {
+  addDoc, collection, doc, getDoc, serverTimestamp, query, where, getDocs, Timestamp, updateDoc
+} from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 /**
- * createAttendanceSession for a specific class
- * - classId
- * - instructorId
- * - durationMinutes
+ * Create attendance session for a class
+ * - classId required
+ * - instructorId required
+ * - durationMinutes optional
  */
 export async function createAttendanceSession({ classId, instructorId, durationMinutes = 10 }) {
-  if (!classId || !instructorId) throw new Error('classId and instructorId required');
+  if (!classId || !instructorId) throw new Error("classId and instructorId required");
 
-  const docRef = await addDoc(collection(db, "attendance_sessions"), {
+  // expiresAt as Timestamp (serverTimestamp cannot be offset easily)
+  const expiresAtDate = new Date(Date.now() + durationMinutes * 60 * 1000);
+  const expiresAt = Timestamp.fromDate(expiresAtDate);
+
+  const ref = await addDoc(collection(db, "attendance_sessions"), {
     classId,
     instructorId,
     createdAt: serverTimestamp(),
-    expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000),
+    startedAt: serverTimestamp(),
+    expiresAt,
     active: true,
     durationMinutes
   });
 
-  const payload = { sessionId: docRef.id, classId };
-
-  return { sessionId: docRef.id, qrPayload: JSON.stringify(payload) };
+  const payload = { sessionId: ref.id, classId };
+  return { sessionId: ref.id, qrPayload: JSON.stringify(payload) };
 }
 
-/**
- * markAttendance: record scan for session
- * - prevent duplicate per session per user
- */
 export async function markAttendance({ sessionId, classId, user }) {
-  if (!sessionId || !user || !user.uid) throw new Error("missing parameters");
+  if (!sessionId || !user || !user.uid) throw new Error("Missing parameters");
 
   const sessionRef = doc(db, "attendance_sessions", sessionId);
   const sessionSnap = await getDoc(sessionRef);
@@ -38,19 +40,18 @@ export async function markAttendance({ sessionId, classId, user }) {
 
   const session = sessionSnap.data();
   if (!session.active) throw new Error("Session is closed");
+
+  // expiresAt may be Firestore Timestamp
   if (session.expiresAt) {
     const expires = session.expiresAt.toDate ? session.expiresAt.toDate() : new Date(session.expiresAt);
     if (new Date() > expires) throw new Error("Session has expired");
   }
 
-  // check duplicate
+  // duplicate check
   const recordsRef = collection(db, "attendance_records");
   const q = query(recordsRef, where("sessionId", "==", sessionId), where("userId", "==", user.uid));
   const snap = await getDocs(q);
-  if (!snap.empty) {
-    // Already checked in
-    return { already: true };
-  }
+  if (!snap.empty) return { already: true };
 
   const rec = await addDoc(recordsRef, {
     sessionId,
@@ -64,9 +65,6 @@ export async function markAttendance({ sessionId, classId, user }) {
   return { recordId: rec.id, already: false };
 }
 
-/**
- * closeSession (optional)
- */
 export async function closeSession(sessionId) {
   const sessionRef = doc(db, "attendance_sessions", sessionId);
   await updateDoc(sessionRef, { active: false });

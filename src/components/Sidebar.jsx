@@ -2,7 +2,6 @@ import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   GraduationCap,
-  BookOpen,
   Users,
   LogOut,
   QrCode,
@@ -18,9 +17,10 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const { userData, loading } = useAuth()
 
-if (loading) return null
+  // 🔒 รอ auth + firestore
+  if (loading || !userData) return null
 
-const role = userData?.role?.toLowerCase()
+  const role = userData.role?.toLowerCase()
 
   const handleLogout = async () => {
     const res = await Swal.fire({
@@ -104,20 +104,6 @@ const role = userData?.role?.toLowerCase()
           <Users size={18} />
           ชุมนุม
         </Link>
-
-         {/* Clubs */}
-        <Link
-          to="/attendance/scan"
-          className="flex items-center gap-3 p-3 rounded hover:bg-primary-600 transition"
-        >
-          <Users size={18} />
-          OI
-        </Link>
-
-
-
-
-
 
       </nav>
 

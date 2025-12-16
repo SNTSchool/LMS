@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
+      setLoading(true)              // ⭐ สำคัญที่สุด
       setUser(u)
 
       if (u) {
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }) => {
         setUserData(null)
       }
 
-      setLoading(false)
+      setLoading(false)             // ⭐ หลัง Firestore เท่านั้น
     })
 
     return () => unsub()

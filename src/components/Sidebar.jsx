@@ -16,9 +16,11 @@ import Swal from 'sweetalert2'
 
 export default function Sidebar() {
   const navigate = useNavigate()
-  const { userData } = useAuth() // ต้องมี role อยู่ในนี้
+  const { userData, loading } = useAuth()
 
-  const role = userData?.role
+if (loading) return null
+
+const role = userData?.role?.toLowerCase()
 
   const handleLogout = async () => {
     const res = await Swal.fire({

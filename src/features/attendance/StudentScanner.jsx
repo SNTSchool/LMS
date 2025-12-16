@@ -4,11 +4,13 @@ import Swal from "sweetalert2";
 import { Html5Qrcode } from "html5-qrcode";
 import { markAttendance } from "../../services/attendanceService";
 import { useAuth } from "../../routes/AuthProvider";
+import { useNavigate } from "react-router-dom";
 
 export default function StudentScanner() {
   const { user } = useAuth();
   const scannerRef = useRef(null);
   const html5QrcodeRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const elementId = "html5qr-reader";
@@ -21,31 +23,46 @@ export default function StudentScanner() {
           { facingMode: "environment" },
           config,
           async (decodedText, decodedResult) => {
-            // stop scanner while processing
-            try {
-              await html5QrcodeRef.current.pause();
-            } catch(e){}
+            // temporarily stop scanning
+            try { await html5QrcodeRef.current.pause(); } catch(e){}
 
             try {
               const parsed = JSON.parse(decodedText);
-              const { sessionId, courseId } = parsed;
-              await markAttendance({ sessionId, courseId, user });
-              Swal.fire({ icon: "success", title: "เช็คชื่อสำเร็จ" });
+              const { sessionId, classId } = parsed;
+
+              // prevent repeat alerts: store lastSession in sessionStorage
+              const lastSession = sessionStorage.getItem('lastScannedSession');
+              if (lastSession === sessionId) {
+                // already scanned in this browser session — redirect silently
+                navigate(`/classes/${classId}`);
+                return;
+              }
+
+              const res = await markAttendance({ sessionId, classId, user });
+
+              if (res.already) {
+                // already checked in: redirect to class without duplicate sweetalert
+                sessionStorage.setItem('lastScannedSession', sessionId);
+                navigate(`/classes/${classId}`);
+                return;
+              }
+
+              // success
+              sessionStorage.setItem('lastScannedSession', sessionId);
+              await Swal.fire({ icon: 'success', title: 'เช็คชื่อสำเร็จ', timer: 1200, showConfirmButton: false });
+              navigate(`/classes/${classId}`);
             } catch (err) {
-              Swal.fire({ icon: "error", title: "ไม่สามารถเช็คชื่อได้", text: err.message || String(err) });
+              await Swal.fire({ icon: 'error', title: 'เช็คชื่อไม่สำเร็จ', text: err.message || String(err) });
             } finally {
-              try {
-                await html5QrcodeRef.current.resume();
-              } catch(e){}
+              try { await html5QrcodeRef.current.resume(); } catch(e){}
             }
           },
           (errorMessage) => {
-            // scan failure, ignore or show tiny console
-            // console.warn("scan failed", errorMessage);
+            // scan failure — ignore
           }
         );
       } catch (err) {
-        Swal.fire({ icon: "error", title: "ไม่สามารถเข้าถึงกล้อง", text: err.message });
+        Swal.fire({ icon: 'error', title: 'ไม่สามารถเข้าถึงกล้อง', text: err.message });
       }
     };
 
@@ -59,13 +76,13 @@ export default function StudentScanner() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, navigate]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <h3 className="text-xl font-bold">สแกน QR เช็คชื่อ</h3>
       <div id="html5qr-reader" ref={scannerRef} className="w-full border rounded bg-white p-2" style={{ minHeight: 360 }} />
-      <p className="text-sm text-slate-500">กรุณาอนุญาตการเข้าถึงกล้อง และสแกน QR ที่อาจารย์แสดง</p>
+      <p className="text-sm text-slate-500">อนุญาตการใช้งานกล้องและสแกน QR ที่อาจารย์แสดง</p>
     </div>
   );
 }

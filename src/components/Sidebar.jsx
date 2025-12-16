@@ -2,11 +2,12 @@ import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   GraduationCap,
+  LayoutDashboard,
   Users,
-  LogOut,
   QrCode,
   ScanLine,
-  LayoutDashboard
+  LogOut,
+  Shield
 } from 'lucide-react'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebaseConfig'
@@ -17,25 +18,15 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const { userData, loading } = useAuth()
 
-  // ถ้ายังโหลด userData ให้แสดง skeleton / nothing (ไม่แจ้ง popup)
-  if (loading) {
-    return (
-      <aside className="w-64 bg-primary-700 text-white fixed h-full p-6 flex flex-col">
-        <div className="animate-pulse space-y-3">
-          <div className="h-8 w-32 bg-white/10 rounded" />
-          <div className="h-4 w-full bg-white/10 rounded" />
-          <div className="h-4 w-full bg-white/10 rounded" />
-        </div>
-      </aside>
-    )
-  }
+  // ระหว่างโหลด userData ห้าม render sidebar
+  if (loading) return null
+  if (!userData) return null
 
-  // ถ้าโหลดเสร็จแต่ยังไม่มี userData ให้แสดงเมนูทั่วไป (หรือซ่อนเมนูเฉพาะ role)
-  const role = userData?.role ? String(userData.role).toLowerCase() : null
+  const role = userData.role?.toLowerCase()
 
   const handleLogout = async () => {
     const res = await Swal.fire({
-      title: 'ยืนยันการออกจากระบบ?',
+      title: 'ออกจากระบบ?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'ออกจากระบบ',
@@ -50,9 +41,9 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-primary-700 text-white fixed h-full p-6 flex flex-col">
+    <aside className="w-64 bg-primary-700 text-white fixed h-full p-6 hidden md:flex flex-col">
 
-      {/* Header */}
+      {/* Logo */}
       <div className="flex items-center gap-3 mb-8">
         <div className="bg-white/10 p-2 rounded">
           <GraduationCap />
@@ -67,58 +58,50 @@ export default function Sidebar() {
 
         {/* Dashboard */}
         {role === 'student' && (
-          <Link
-            to="/"
-            className="flex items-center gap-3 p-3 rounded hover:bg-primary-600 transition"
-          >
+          <Link to="/" className="nav-item">
             <LayoutDashboard size={18} />
-            ภาพรวมการเรียน
+            หน้าหลักนักเรียน
           </Link>
         )}
 
         {role === 'instructor' && (
-          <Link
-            to="/instructor"
-            className="flex items-center gap-3 p-3 rounded hover:bg-primary-600 transition"
-          >
+          <Link to="/instructor" className="nav-item">
             <LayoutDashboard size={18} />
-            แดชบอร์ดอาจารย์
+            หน้าหลักอาจารย์
           </Link>
         )}
 
+        {/* Classes */}
+        <Link to="/classes" className="nav-item">
+          <Users size={18} />
+          ห้องเรียน
+        </Link>
+
         {/* Attendance */}
         {role === 'student' && (
-          <Link
-            to="/attendance/scan"
-            className="flex items-center gap-3 p-3 rounded hover:bg-primary-600 transition"
-          >
+          <Link to="/attendance/scan" className="nav-item">
             <ScanLine size={18} />
             สแกนเช็คชื่อ
           </Link>
         )}
 
         {role === 'instructor' && (
-          <Link
-            to="/attendance/create"
-            className="flex items-center gap-3 p-3 rounded hover:bg-primary-600 transition"
-          >
+          <Link to="/attendance/create" className="nav-item">
             <QrCode size={18} />
             สร้าง QR เช็คชื่อ
           </Link>
         )}
 
-        {/* Clubs - public to all logged-in users */}
-        <Link
-          to="/clubs"
-          className="flex items-center gap-3 p-3 rounded hover:bg-primary-600 transition"
-        >
-          <Users size={18} />
-          ชุมนุม
-        </Link>
-
+        {/* Admin */}
+        {role === 'admin' && (
+          <Link to="/admin" className="nav-item">
+            <Shield size={18} />
+            Admin Dashboard
+          </Link>
+        )}
       </nav>
 
-      {/* Footer */}
+      {/* Logout */}
       <div className="pt-4 border-t border-white/20">
         <button
           onClick={handleLogout}

@@ -17,10 +17,21 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const { userData, loading } = useAuth()
 
-  // 🔒 รอ auth + firestore
-  if (loading || !userData) return null
+  // ถ้ายังโหลด userData ให้แสดง skeleton / nothing (ไม่แจ้ง popup)
+  if (loading) {
+    return (
+      <aside className="w-64 bg-primary-700 text-white fixed h-full p-6 flex flex-col">
+        <div className="animate-pulse space-y-3">
+          <div className="h-8 w-32 bg-white/10 rounded" />
+          <div className="h-4 w-full bg-white/10 rounded" />
+          <div className="h-4 w-full bg-white/10 rounded" />
+        </div>
+      </aside>
+    )
+  }
 
-  const role = userData.role?.toLowerCase()
+  // ถ้าโหลดเสร็จแต่ยังไม่มี userData ให้แสดงเมนูทั่วไป (หรือซ่อนเมนูเฉพาะ role)
+  const role = userData?.role ? String(userData.role).toLowerCase() : null
 
   const handleLogout = async () => {
     const res = await Swal.fire({
@@ -39,7 +50,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-primary-700 text-white fixed h-full p-6 hidden md:flex flex-col">
+    <aside className="w-64 bg-primary-700 text-white fixed h-full p-6 flex flex-col">
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
@@ -96,7 +107,7 @@ export default function Sidebar() {
           </Link>
         )}
 
-        {/* Clubs */}
+        {/* Clubs - public to all logged-in users */}
         <Link
           to="/clubs"
           className="flex items-center gap-3 p-3 rounded hover:bg-primary-600 transition"

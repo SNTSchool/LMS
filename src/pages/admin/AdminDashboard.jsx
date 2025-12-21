@@ -77,7 +77,7 @@ export default function AdminDashboard() {
         showConfirmButton: false
       })
       loadUsers()
-      })
+      }
       
     } catch (err) {
       Swal.fire({

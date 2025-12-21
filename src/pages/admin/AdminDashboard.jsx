@@ -66,10 +66,10 @@ export default function AdminDashboard() {
       const user = userCredential.user;
       const uid = user.uid
       await setDoc(doc(db, 'users', uid), {
-      email: form.email,
-      role: form.role,
-      updatedAt: new Date()
-        
+        email: form.email,
+        role: form.role,
+        updatedAt: new Date()
+      }
       await Swal.fire({
         icon: 'success',
         title: 'บันทึกสำเร็จ',

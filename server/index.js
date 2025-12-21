@@ -706,6 +706,38 @@ app.get('/api/classes/:classId/assignments', verifyIdTokenFromHeader, async (req
   }
 })
 
+// GET /api/attendance/sessions/:sessionId/export
+app.get(
+  '/api/attendance/sessions/:sessionId/export',
+  verifyIdTokenFromHeader,
+  async (req, res) => {
+    try {
+      if (!['teacher', 'admin'].includes(req.userRole)) {
+        return res.status(403).json({ error: 'Forbidden' })
+      }
+
+      const { sessionId } = req.params
+      const snap = await db
+        .collection('attendance_records')
+        .where('sessionId', '==', sessionId)
+        .get()
+
+      let csv = 'uid,timestamp\n'
+      snap.forEach(d => {
+        const r = d.data()
+        csv += `${r.uid},${r.timestamp?.toDate?.() || ''}\n`
+      })
+
+      res.setHeader('Content-Type', 'text/csv')
+      res.send(csv)
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  }
+)
+
+
 
 /* =========================================================
    START SERVER

@@ -1,11 +1,11 @@
-import React from 'react'
+// src/components/Layout.jsx
 import Sidebar from './Sidebar'
 
 export default function Layout({ children }) {
   return (
-    <div className="min-h-screen bg-primary-50 flex">
+    <div className="flex h-screen">
       <Sidebar />
-      <main className="flex-1 ml-64 p-6 md:p-8">
+      <main className="flex-1 overflow-auto bg-gray-100 p-4">
         {children}
       </main>
     </div>

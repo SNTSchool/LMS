@@ -200,17 +200,19 @@ app.get('/api/classes/:classId', verifyIdTokenFromHeader, async (req, res) => {
     const assignmentsSnap = await cRef.collection('assignments').get()
     const filesSnap = await cRef.collection('files').get()
 
-    let sessions = []
-    try {
-      const sessSnap = await db
-        .collection('attendance_sessions')
-        .where('classId', '==', classId)
-        .get()
+   let sessions = []
 
-      sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-    } catch {
-      sessions = []
-    }
+try {
+  const sessSnap = await db
+    .collection('attendance_sessions')
+    .where('classId', '==', classId)
+    .get()
+
+  sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+} catch (e) {
+  console.warn('attendance_sessions not ready yet')
+  sessions = []
+}
 
     const assignments = assignmentsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
     const files = filesSnap.docs.map(d => ({ id: d.id, ...d.data() }))

@@ -4,13 +4,18 @@ const API = import.meta.env.VITE_API_URL
 
 export async function apiFetch(path, options = {}) {
   const user = auth.currentUser
-  const token = user ? await user.getIdToken() : null
+
+  if (!user) {
+    throw new Error('Not authenticated')
+  }
+
+  const token = await user.getIdToken(true)
 
   const res = await fetch(`${API}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
+      Authorization: `Bearer ${token}`
     }
   })
 

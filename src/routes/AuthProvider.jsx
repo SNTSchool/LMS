@@ -8,7 +8,10 @@ const AuthContext = createContext()
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> parent of 21902be (Update AuthProvider.jsx)
 =======
 >>>>>>> parent of 21902be (Update AuthProvider.jsx)
 const value = {
@@ -19,6 +22,9 @@ const value = {
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> parent of 21902be (Update AuthProvider.jsx)
+=======
 >>>>>>> parent of 21902be (Update AuthProvider.jsx)
 =======
 >>>>>>> parent of 21902be (Update AuthProvider.jsx)

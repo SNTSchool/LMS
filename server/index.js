@@ -184,7 +184,7 @@ app.post('/api/classes/join', verifyIdTokenFromHeader, async (req, res) => {
 })
 
 // server/index.js
-import express from 'express'
+//import express from 'express'
 import cors from 'cors'
 import admin from 'firebase-admin'
 

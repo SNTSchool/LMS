@@ -6,6 +6,13 @@ import Swal from 'sweetalert2'
 
 const AuthContext = createContext()
 
+const value = {
+  user,
+  userData, // { role, name, ... }
+  loading
+}
+
+
 export const useAuth = () => useContext(AuthContext)
 
 export const AuthProvider = ({ children }) => {

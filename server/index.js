@@ -3,7 +3,10 @@ import express from 'express'
 import cors from 'cors'
 import admin from 'firebase-admin'
 import multer from 'multer'
-const upload = multer({ storage: multer.memoryStorage() })
+import fs from 'fs'
+import { drive, ensureFolder } from './drive.js'
+
+const upload = multer({ dest: 'tmp/' })
 
 /* =========================================================
    ENV CHECK
@@ -417,6 +420,61 @@ app.post('/api/classes/:classId/assignments/:assignmentId/submit', verifyIdToken
   }
 })
 
+// POST /api/classes/:classId/assignments/:assignmentId/upload
+app.post(
+  '/api/classes/:classId/assignments/:assignmentId/upload',
+  verifyIdTokenFromHeader,
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const { classId, assignmentId } = req.params
+      const uid = req.user.uid
+      const file = req.file
+
+      if (!file) return res.status(400).json({ error: 'No file' })
+
+      // root LMS folder (hardcode once)
+      const LMS_FOLDER_ID = process.env.LMS_FOLDER_ID
+
+      const classFolder = await ensureFolder(classId, LMS_FOLDER_ID)
+      const assignFolder = await ensureFolder('Assignments', classFolder)
+      const thisAssign = await ensureFolder(assignmentId, assignFolder)
+      const userFolder = await ensureFolder(uid, thisAssign)
+
+      const uploaded = await drive.files.create({
+        resource: {
+          name: file.originalname,
+          parents: [userFolder]
+        },
+        media: {
+          mimeType: file.mimetype,
+          body: fs.createReadStream(file.path)
+        },
+        fields: 'id, webViewLink'
+      })
+
+      fs.unlinkSync(file.path)
+
+      // save to firestore
+      await db
+        .collection('classes')
+        .doc(classId)
+        .collection('assignments')
+        .doc(assignmentId)
+        .collection('submissions')
+        .doc(uid)
+        .set({
+          submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+          fileUrl: uploaded.data.webViewLink
+        })
+
+      res.json({ ok: true, url: uploaded.data.webViewLink })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  }
+)
 
 
 

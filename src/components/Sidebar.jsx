@@ -1,193 +1,88 @@
+// src/components/Sidebar.jsx
 import React from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  GraduationCap,
   LayoutDashboard,
-  Users,
+  BookOpen,
   ClipboardList,
   Upload,
-  QrCode,
-  ScanLine,
-  FileSpreadsheet,
+  Users,
   Shield,
-  LogOut,
-  PlusCircle
+  LogOut
 } from 'lucide-react'
-import { signOut } from 'firebase/auth'
-import { auth } from '../firebaseConfig'
 import { useAuth } from '../routes/AuthProvider'
-import Swal from 'sweetalert2'
 
 export default function Sidebar() {
+  const { userData, logout } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
-  const { userData, loading } = useAuth()
 
-  if (loading || !userData) return null
+  const role = userData?.role
 
-  const role = userData.role?.toLowerCase()
-
-  const handleLogout = async () => {
-    const res = await Swal.fire({
-      title: 'ออกจากระบบ?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'ออกจากระบบ',
-      cancelButtonText: 'ยกเลิก',
-      confirmButtonColor: '#16a34a'
-    })
-
-    if (res.isConfirmed) {
-      await signOut(auth)
-      navigate('/login')
-    }
-  }
-
-  const NavItem = ({ to, icon: Icon, label }) => {
-    const active = location.pathname === to
-    return (
-      <Link
-        to={to}
-        className={`flex items-center gap-3 px-3 py-2 rounded transition
-          ${active ? 'bg-primary-600' : 'hover:bg-primary-600'}
-        `}
-      >
-        <Icon size={18} />
-        <span>{label}</span>
-      </Link>
-    )
-  }
+  const linkClass =
+    'flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100'
 
   return (
-    <aside className="w-64 bg-primary-700 text-white fixed inset-y-0 left-0 p-5 hidden md:flex flex-col">
-
-      {/* Logo */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="bg-white/10 p-2 rounded">
-          <GraduationCap />
-        </div>
-        <div className="font-bold text-lg tracking-wide">
-          UniPortal
-        </div>
+    <aside className="w-64 h-screen border-r bg-white flex flex-col">
+      {/* ===== Header ===== */}
+      <div className="px-4 py-4 border-b">
+        <h1 className="text-lg font-bold">
+          Learning Management System
+        </h1>
+        <p className="text-xs text-gray-500">
+          {userData?.email}
+        </p>
       </div>
 
-      <nav className="flex-1 space-y-1 text-sm overflow-y-auto">
+      {/* ===== Navigation ===== */}
+      <nav className="flex-1 p-3 space-y-1">
+        <NavLink to="/" className={linkClass}>
+          <LayoutDashboard size={18} />
+          Dashboard
+        </NavLink>
 
-        {/* ================= Dashboard ================= */}
-        <NavItem
-          to="/"
-          icon={LayoutDashboard}
-          label={
-            role === 'student'
-              ? 'แดชบอร์ดนักเรียน'
-              : role === 'instructor'
-              ? 'แดชบอร์ดอาจารย์'
-              : 'แดชบอร์ด'
-          }
-        />
+        <NavLink to="/classes" className={linkClass}>
+          <BookOpen size={18} />
+          Classes
+        </NavLink>
 
-        {/* ================= Classroom ================= */}
-        <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
-          Classroom
-        </div>
-
-        <NavItem
-          to="/classes"
-          icon={Users}
-          label="ห้องเรียนทั้งหมด"
-        />
-
-        {(role === 'instructor' || role === 'admin') && (
-          <NavItem
-            to="/classes?create=true"
-            icon={PlusCircle}
-            label="สร้างห้องเรียน"
-          />
-        )}
-
-        {/* ================= Assignments ================= */}
-        <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
+        <NavLink to="/assignments" className={linkClass}>
+          <ClipboardList size={18} />
           Assignments
-        </div>
+        </NavLink>
 
-        <NavItem
-          to="/assignments"
-          icon={ClipboardList}
-          label="งานที่มอบหมาย"
-        />
+        <NavLink to="/submissions" className={linkClass}>
+          <Upload size={18} />
+          Submissions
+        </NavLink>
 
-        {role === 'student' && (
-          <NavItem
-            to="/assignments/submissions"
-            icon={Upload}
-            label="ส่งงานของฉัน"
-          />
+        {/* ===== Teacher + Admin ===== */}
+        {(role === 'teacher' || role === 'admin') && (
+          <NavLink to="/people" className={linkClass}>
+            <Users size={18} />
+            People
+          </NavLink>
         )}
 
-        {(role === 'instructor' || role === 'admin') && (
-          <NavItem
-            to="/assignments/manage"
-            icon={ClipboardList}
-            label="จัดการงาน"
-          />
-        )}
-
-        {/* ================= Attendance ================= */}
-        <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
-          Attendance
-        </div>
-
-        {role === 'student' && (
-          <NavItem
-            to="/attendance/scan"
-            icon={ScanLine}
-            label="สแกนเช็คชื่อ"
-          />
-        )}
-
-        {(role === 'instructor' || role === 'admin') && (
-          <NavItem
-            to="/attendance/create"
-            icon={QrCode}
-            label="สร้าง QR เช็คชื่อ"
-          />
-        )}
-
-        {/* ================= Reports ================= */}
-        <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
-          Reports
-        </div>
-
-        <NavItem
-          to="/reports"
-          icon={FileSpreadsheet}
-          label="รายงาน & Export"
-        />
-
-        {/* ================= Admin ================= */}
+        {/* ===== Admin only ===== */}
         {role === 'admin' && (
-          <>
-            <div className="mt-4 text-xs uppercase tracking-wide text-white/60">
-              Admin
-            </div>
-
-            <NavItem
-              to="/admin"
-              icon={Shield}
-              label="Admin Dashboard"
-            />
-          </>
+          <NavLink to="/admin" className={linkClass}>
+            <Shield size={18} />
+            Admin
+          </NavLink>
         )}
       </nav>
 
-      {/* Logout */}
-      <div className="pt-4 border-t border-white/20">
+      {/* ===== Footer ===== */}
+      <div className="p-3 border-t">
         <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded bg-white/10 hover:bg-white/20 transition"
+          onClick={() => {
+            logout()
+            navigate('/login')
+          }}
+          className="flex items-center gap-3 px-4 py-2 w-full rounded hover:bg-red-50 text-red-600"
         >
           <LogOut size={18} />
-          ออกจากระบบ
+          Logout
         </button>
       </div>
     </aside>

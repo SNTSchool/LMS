@@ -75,6 +75,39 @@ app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
   })
 })
 
+/* ===== Classes ===== */
+
+// list classes
+app.get('/api/classes', authMiddleware, async (req, res) => {
+  const snap = await db
+    .collection('classes')
+    .where('members', 'array-contains', req.user.uid)
+    .get()
+
+  const data = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }))
+
+  res.json(data)
+})
+
+// create class
+app.post('/api/classes', authMiddleware, async (req, res) => {
+  const { name, section } = req.body
+
+  const doc = await db.collection('classes').add({
+    name,
+    section,
+    owner: req.user.uid,
+    members: [req.user.uid],
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  })
+
+  res.json({ id: doc.id })
+})
+
+
 /* ===== Start ===== */
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {

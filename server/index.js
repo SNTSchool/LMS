@@ -333,6 +333,27 @@ app.post('/api/attendance/scan/:sessionId', verifyIdTokenFromHeader, async (req,
   }
 })
 
+// POST /api/attendance/sessions/:sessionId/close
+app.post('/api/attendance/sessions/:sessionId/close', verifyIdTokenFromHeader, async (req, res) => {
+  try {
+    if (!['teacher', 'admin'].includes(req.userRole)) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    const { sessionId } = req.params
+
+    await db.collection('attendance_sessions')
+      .doc(sessionId)
+      .update({ active: false })
+
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+
 
 
 
@@ -389,6 +410,73 @@ app.get('/api/classes/:classId', verifyIdTokenFromHeader, async (req, res) => {
     return res.status(500).json({ error: err.message })
   }
 })
+
+// GET /api/attendance/sessions/:sessionId/export
+app.get('/api/attendance/sessions/:sessionId/export', verifyIdTokenFromHeader, async (req, res) => {
+  try {
+    if (!['teacher', 'admin'].includes(req.userRole)) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    const { sessionId } = req.params
+    const ref = db.collection('attendance_sessions').doc(sessionId)
+    const snap = await ref.get()
+
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+
+    const recordsSnap = await ref.collection('records').get()
+
+    let csv = 'uid,name,email,checkedAt\n'
+
+    recordsSnap.forEach(doc => {
+      const r = doc.data()
+      csv += `${doc.id},"${r.displayName || ''}","${r.email || ''}",${r.checkedAt?.toDate().toISOString()}\n`
+    })
+
+    res.setHeader('Content-Type', 'text/csv')
+    res.setHeader('Content-Disposition', `attachment; filename="attendance-${sessionId}.csv"`)
+
+    return res.send(csv)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+
+// GET /api/attendance/sessions/:sessionId
+app.get('/api/attendance/sessions/:sessionId', verifyIdTokenFromHeader, async (req, res) => {
+  try {
+    if (!['teacher', 'admin'].includes(req.userRole)) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    const { sessionId } = req.params
+    const ref = db.collection('attendance_sessions').doc(sessionId)
+    const snap = await ref.get()
+
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+
+    const recordsSnap = await ref.collection('records')
+      .orderBy('checkedAt', 'asc')
+      .get()
+
+    const records = recordsSnap.docs.map(d => ({
+      uid: d.id,
+      ...d.data()
+    }))
+
+    return res.json(records)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 
 /* =========================================================
    START SERVER

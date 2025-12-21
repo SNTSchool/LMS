@@ -8,7 +8,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/classes" element={<Classes />} />
       <Route path="/classes/create" element={<CreateClass />} />
-      <Route path="/classes/:id" element={<Classroom />} />
+      <Route path="/classes/:id" element={<ClassDetail />} />
     </Routes>
   )
 }

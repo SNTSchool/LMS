@@ -44,6 +44,9 @@ export default function App() {
         </ProtectedRoute>
       } />
 
+      <Route path="/attendance/scan" element={<AttendanceScan />} />
+
+
       {/* Instructor Dashboard */}
       <Route path="/instructor" element={
         <ProtectedRoute>

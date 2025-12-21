@@ -1,11 +1,11 @@
-// src/pages/ClassDetail.jsx
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import apiFetch from '../api/apiFetch'
 import Swal from 'sweetalert2'
+import apiFetch from '../api/apiFetch'
+import ClassroomTabs from '../components/classroom/ClassroomTabs'
 
 export default function ClassDetail() {
-  const { classId } = useParams()
+  const { id } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -13,35 +13,37 @@ export default function ClassDetail() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await apiFetch(`/api/classes/${classId}`)
+        const res = await apiFetch(`/api/classes/${id}`)
         setData(res)
       } catch (err) {
-        // if 403/404 redirect to classes list and alert
-        Swal.fire({ icon: 'error', title: 'ไม่พบหรือไม่ได้รับอนุญาต', text: 'ห้องเรียนนี้ไม่มีอยู่ในระบบหรือคุณไม่มีสิทธิ์' })
+        Swal.fire(
+          'ไม่พบห้องเรียน',
+          'ห้องเรียนนี้ไม่มีอยู่ในระบบ',
+          'error'
+        )
         navigate('/classes')
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [classId])
+  }, [id])
 
   if (loading) return <div>Loading...</div>
   if (!data) return null
 
-  const { klass, assignments, sessions, files } = data
-
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-2xl font-bold">{klass.name}</h2>
-          <p className="text-sm text-slate-500">{klass.description}</p>
-          <div className="text-xs mt-1">รหัสห้อง: <span className="font-mono">{klass.code}</span></div>
+    <div className="p-6">
+      <div className="mb-6 border-b pb-4">
+        <h1 className="text-2xl font-bold">
+          {data.klass.name}
+        </h1>
+        <div className="text-sm text-gray-500">
+          Class code: {data.klass.code}
         </div>
       </div>
 
-      {/* ... render assignments / sessions / files similar to earlier code ... */}
+      <ClassroomTabs data={data} />
     </div>
   )
 }

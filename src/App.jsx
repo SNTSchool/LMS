@@ -8,6 +8,7 @@ import InstructorDashboard from './pages/InstructorDashboard'
 import AdminDashboard from './pages/admin/AdminDashboard'
 
 import { useAuth } from './routes/AuthProvider'
+import { AuthProvider } from './routes/AuthProvider'
 import ProtectedRoute from './routes/ProtectedRoute'
 import Layout from './components/Layout'
 

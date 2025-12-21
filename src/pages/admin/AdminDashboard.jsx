@@ -30,6 +30,7 @@ export default function AdminDashboard() {
     const { value: form } = await Swal.fire({
       title: 'สร้าง / แก้ไขผู้ใช้',
       html: `
+        <input id="uid" class="swal2-input" placeholder="UID">
         <input id="email" class="swal2-input" placeholder="Email">
         <select id="role" class="swal2-input">
           <option value="student">student</option>
@@ -40,33 +41,25 @@ export default function AdminDashboard() {
       focusConfirm: false,
       preConfirm: () => {
         
-        //const uid = document.getElementById('uid').value
+        const uid = document.getElementById('uid').value
         const email = document.getElementById('email').value
         //const password = 'tpstudent123'
         const role = document.getElementById('role').value
         if (!email) {
           Swal.showValidationMessage('ต้องกรอก Email')
         }
-        return { email, role }
+        return { uid, email, role }
       }
     })
 
     if (!form) return
 
     try {
-      const password = 'tpstudent123'
-      await createUserWithEmailAndPassword(auth, form.email, password)
-       if (!userCredential || !userCredential.user) {
-          await Swal.fire({
-            icon: 'error',
-            title: 'ผิดพลาด',
-            text: 'ระบบไม่สามารถสร้างบัญชีผู้ใช้ได้'
-          })
-          return
-        }
-      const user = userCredential.user;
-      const uid = user.uid
-      await setDoc(doc(db, 'users', uid), {
+      //const password = 'tpstudent123'
+      
+      //const user = userCredential.user;
+     // const uid = user.uid
+      await setDoc(doc(db, 'users', form.uid), {
         email: form.email,
         role: form.role,
         updatedAt: new Date()

@@ -9,6 +9,7 @@ export default function AppRoutes() {
       <Route path="/classes" element={<Classes />} />
       <Route path="/classes/create" element={<CreateClass />} />
       <Route path="/classes/:id" element={<ClassDetail />} />
+      <Route path="/attendance/scan/:sessionId"element={<AttendanceScan />}/>
     </Routes>
   )
 }

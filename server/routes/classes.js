@@ -5,11 +5,13 @@ import admin from 'firebase-admin'
 const router = express.Router()
 const db = admin.firestore()
 
-router.get('/', verifyFirebaseToken, async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
+    const uid = req.user.uid
+
     const snap = await db
       .collection('classes')
-      .where('teacherId', '==', req.user.uid)
+      .where('members', 'array-contains', uid)
       .get()
 
     const classes = snap.docs.map(d => ({
@@ -17,10 +19,12 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
       ...d.data()
     }))
 
-    res.json(classes)
+    return res.json(classes) // ⭐ array เท่านั้น
   } catch (e) {
-    res.status(500).json({ error: e.message })
+    console.error(e)
+    return res.json([]) // ⭐ อย่าคืน object
   }
 })
+
 
 export default router

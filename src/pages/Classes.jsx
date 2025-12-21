@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../api/api'
-import { Link } from 'react-router-dom'
+import { useAuth } from '../routes/AuthProvider'
 
 export default function Classes() {
+  const { user, loading } = useAuth()
   const [classes, setClasses] = useState([])
+  const [error, setError] = useState(null)
 
   useEffect(() => {
+    if (loading || !user) return
+
     apiFetch('/api/classes')
       .then(data => {
         if (Array.isArray(data)) {
@@ -14,19 +18,19 @@ export default function Classes() {
           setClasses([])
         }
       })
-      .catch(() => setClasses([]))
-  }, [])
+      .catch(err => {
+        setError(err.message)
+        setClasses([])
+      })
+  }, [loading, user])
+
+  if (loading) return <div>Loading...</div>
+  if (error) return <div>Error: {error}</div>
 
   return (
     <div>
-      <Link to="/classes/create">+ Create Class</Link>
-
       {classes.map(c => (
-        <div key={c.id}>
-          <Link to={`/classes/${c.id}`}>
-            {c.name} ({c.section})
-          </Link>
-        </div>
+        <div key={c.id}>{c.name}</div>
       ))}
     </div>
   )

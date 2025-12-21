@@ -1,9 +1,16 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from './AuthProvider';
+import { Navigate } from 'react-router-dom'
+import { useAuth } from './AuthProvider'
 
-export default function ProtectedRoute({ children, redirectTo = '/login' }) {
-  const { user, loading } = useAuth();
-  if (loading) return <div>Loading...</div>;
-  return user ? children : <Navigate to={redirectTo} />;
+export default function ProtectedRoute({ children, allow }) {
+  const { userData, loading } = useAuth()
+
+  if (loading) return null
+  if (!userData) return <Navigate to="/login" />
+
+  if (userData.role === 'admin') return children
+  if (allow && !allow.includes(userData.role)) {
+    return <Navigate to="/classes" />
+  }
+
+  return children
 }

@@ -256,6 +256,85 @@ app.post(
   }
 )
 
+// POST /api/attendance/sessions
+app.post('/api/attendance/sessions', verifyIdTokenFromHeader, async (req, res) => {
+  try {
+    if (!['teacher', 'admin'].includes(req.userRole)) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    const { classId } = req.body
+    if (!classId) return res.status(400).json({ error: 'Missing classId' })
+
+    const expiresAt = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() + 15 * 60 * 1000) // 15 นาที
+    )
+
+    const ref = await db.collection('attendance_sessions').add({
+      classId,
+      createdBy: req.user.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt,
+      active: true
+    })
+
+    return res.json({
+      ok: true,
+      sessionId: ref.id,
+      qrUrl: `${process.env.CLIENT_URL}/attendance/scan/${ref.id}`
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/attendance/scan/:sessionId
+app.post('/api/attendance/scan/:sessionId', verifyIdTokenFromHeader, async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const uid = req.user.uid
+
+    const sRef = db.collection('attendance_sessions').doc(sessionId)
+    const sSnap = await sRef.get()
+
+    if (!sSnap.exists) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+
+    const s = sSnap.data()
+    if (!s.active) {
+      return res.status(400).json({ error: 'Session closed' })
+    }
+
+    if (s.expiresAt.toMillis() < Date.now()) {
+      await sRef.update({ active: false })
+      return res.status(400).json({ error: 'Session expired' })
+    }
+
+    const rRef = sRef.collection('records').doc(uid)
+    const rSnap = await rRef.get()
+
+    if (rSnap.exists) {
+      return res.status(409).json({ error: 'Already checked in' })
+    }
+
+    await rRef.set({
+      uid,
+      displayName: req.user.name || '',
+      email: req.user.email || '',
+      checkedAt: admin.firestore.FieldValue.serverTimestamp()
+    })
+
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+
+
 
 /* ---------------------------------------------------------
    GET /api/classes/:classId

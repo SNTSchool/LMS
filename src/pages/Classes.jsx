@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { auth } from '../firebaseConfig'
 
-const API = 'https://YOUR-BACKEND.onrender.com'
+const API = 'https://lms-4ljz.onrender.com/'
 
 export default function Classes() {
   const [classes, setClasses] = useState([])

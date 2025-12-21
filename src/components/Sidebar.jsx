@@ -23,10 +23,11 @@ export default function Sidebar() {
 
         <div className="border-t my-2" />
 
-        <button
-          onClick={() => alert('logout later')}
-          className="p-2 text-left rounded hover:bg-red-100 text-red-600"
-        >
+        <NavLink to="/profile" className="p-2 rounded hover:bg-gray-100">
+          โปรไฟล์
+        </NavLink>
+
+        <button className="p-2 text-left rounded hover:bg-red-100 text-red-600">
           ออกจากระบบ
         </button>
       </nav>

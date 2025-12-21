@@ -1,19 +1,21 @@
-import { auth } from '../firebaseAdmin.js'
+import admin from '../firebaseAdmin.js'
 
-export async function verifyFirebaseToken(req, res, next) {
-  const header = req.headers.authorization
-
-  if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Missing token' })
-  }
-
-  const token = header.split('Bearer ')[1]
-
+export async function requireAuth(req, res, next) {
   try {
-    const decoded = await auth.verifyIdToken(token)
-    req.user = decoded
+    const authHeader = req.headers.authorization || ''
+
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing token' })
+    }
+
+    const token = authHeader.replace('Bearer ', '').trim()
+
+    const decoded = await admin.auth().verifyIdToken(token)
+
+    req.user = decoded   // uid, email, etc.
     next()
   } catch (err) {
-    return res.status(401).json({ message: 'Invalid token' })
+    console.error('AUTH ERROR:', err.message)
+    return res.status(401).json({ error: 'Invalid token' })
   }
 }

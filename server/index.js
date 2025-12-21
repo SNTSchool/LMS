@@ -24,6 +24,29 @@ function genRoomCode(len = 6) {
   return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
+async function verifyIdTokenFromHeader(req, res, next) {
+  const header = req.headers.authorization || ''
+  if (!header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing token' })
+  }
+
+  const idToken = header.split(' ')[1]
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken)
+    req.user = decoded
+
+    const snap = await db.doc(`users/${decoded.uid}`).get()
+    req.userRole = snap.exists ? snap.data().role : 'student'
+
+    next()
+  } catch (err) {
+    console.error('verify token error', err)
+    return res.status(401).json({ error: 'Invalid token' })
+  }
+}
+
+
 /* ----------------------------------------
    GET /api/classes
 ---------------------------------------- */

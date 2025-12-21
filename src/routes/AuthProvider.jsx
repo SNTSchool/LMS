@@ -6,6 +6,16 @@ import Swal from 'sweetalert2'
 
 const AuthContext = createContext()
 
+<<<<<<< HEAD
+=======
+const value = {
+  user,
+  userData, // { role, name, ... }
+  loading
+}
+
+
+>>>>>>> parent of 21902be (Update AuthProvider.jsx)
 export const useAuth = () => useContext(AuthContext)
 
 export const AuthProvider = ({ children }) => {

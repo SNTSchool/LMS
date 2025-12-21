@@ -1,20 +1,14 @@
 import { google } from 'googleapis'
+import admin from 'firebase-admin'
 
-const auth = new google.auth.GoogleAuth({
-  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT),
-  scopes: ['https://www.googleapis.com/auth/drive']
+const auth = new google.auth.JWT(
+  admin.credential.applicationDefault().clientEmail,
+  null,
+  admin.credential.applicationDefault().privateKey,
+  ['https://www.googleapis.com/auth/drive']
+)
+
+export const drive = google.drive({
+  version: 'v3',
+  auth
 })
-
-export const drive = google.drive({ version: 'v3', auth })
-
-export async function createClassFolder(className) {
-  const res = await drive.files.create({
-    requestBody: {
-      name: className,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [process.env.SHARED_DRIVE_ID]
-    },
-    supportsAllDrives: true
-  })
-  return res.data.id
-}

@@ -176,32 +176,58 @@ app.post('/api/classes/join', verifyIdTokenFromHeader, async (req, res) => {
 app.get('/api/classes/:classId', verifyIdTokenFromHeader, async (req, res) => {
   try {
     const { classId } = req.params
-    const snap = await db.collection('classes').doc(classId).get()
 
-    if (!snap.exists) {
+    const cRef = db.collection('classes').doc(classId)
+    const cSnap = await cRef.get()
+
+    if (!cSnap.exists) {
       return res.status(404).json({ error: 'Class not found' })
     }
 
-    const data = snap.data()
+    const c = cSnap.data()
+
+    // 🔒 (คุณ bypass แล้ว แต่คงไว้)
     const uid = req.user.uid
     const role = req.userRole
 
-    const isTeacher = data.teacherIds?.includes(uid)
-    const isMember = data.members?.includes(uid)
-
+    const isTeacher = Array.isArray(c.teacherIds) && c.teacherIds.includes(uid)
+    const isMember = Array.isArray(c.members) && c.members.includes(uid)
     if (!(isTeacher || isMember || role === 'admin')) {
       return res.status(403).json({ error: 'Forbidden' })
     }
 
+    // ✅ SAFE FETCH (ถ้าไม่มีจะได้ empty array)
+    const assignmentsSnap = await cRef.collection('assignments').get()
+    const filesSnap = await cRef.collection('files').get()
+
+    let sessions = []
+    try {
+      const sessSnap = await db
+        .collection('attendance_sessions')
+        .where('classId', '==', classId)
+        .get()
+
+      sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    } catch {
+      sessions = []
+    }
+
+    const assignments = assignmentsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const files = filesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+
     return res.json({
-      id: classId,
-      ...data
+      klass: { id: classId, ...c },
+      assignments,
+      sessions,
+      files
     })
+
   } catch (err) {
-    console.error(err)
+    console.error('CLASS DETAIL ERROR:', err)
     return res.status(500).json({ error: err.message })
   }
 })
+
 
 /* =========================================================
    Start Server

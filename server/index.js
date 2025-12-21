@@ -36,6 +36,12 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+function hasRole(userRole, allow = []) {
+  if (userRole === 'admin') return true
+  return allow.includes(userRole)
+}
+
+
 /* =========================================================
    Helpers
 ========================================================= */
@@ -108,9 +114,10 @@ app.get('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
 --------------------------------------------------------- */
 app.post('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    if (!['admin', 'instructor'].includes(req.userRole)) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
+    if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
     const { name, description } = req.body
     if (!name) {
@@ -190,9 +197,10 @@ app.post('/api/classes/join', verifyIdTokenFromHeader, async (req, res) => {
 
 app.post('/api/classes/:id/assignments', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    if (!['teacher', 'admin'].includes(req.userRole)) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
+   if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
     const { title, description, dueAt, type } = req.body
     const { id: classId } = req.params
@@ -262,9 +270,10 @@ app.post(
 // POST /api/attendance/sessions
 app.post('/api/attendance/sessions', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    if (!['teacher', 'admin'].includes(req.userRole)) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
+   if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
     const { classId } = req.body
     if (!classId) return res.status(400).json({ error: 'Missing classId' })
@@ -345,9 +354,10 @@ app.post(
     try {
       const { sessionId } = req.params
 
-      if (!['teacher', 'admin'].includes(req.userRole)) {
-        return res.status(403).json({ error: 'Forbidden' })
-      }
+     if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
       await db
         .collection('attendance_sessions')
@@ -367,9 +377,10 @@ app.post(
 // POST /api/classes/:classId/assignments
 app.post('/api/classes/:classId/assignments', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    if (!['teacher', 'admin'].includes(req.userRole)) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
+   if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
     const { classId } = req.params
     const { title, description, type, dueAt } = req.body
@@ -538,9 +549,10 @@ app.post(
     try {
       const { classId } = req.params
 
-      if (!['teacher', 'admin'].includes(req.userRole)) {
-        return res.status(403).json({ error: 'Forbidden' })
-      }
+     if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
       const sessionRef = await db.collection('attendance_sessions').add({
         classId,
@@ -619,9 +631,10 @@ app.get('/api/classes/:classId', verifyIdTokenFromHeader, async (req, res) => {
 // GET /api/attendance/sessions/:sessionId/export
 app.get('/api/attendance/sessions/:sessionId/export', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    if (!['teacher', 'admin'].includes(req.userRole)) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
+  if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
     const { sessionId } = req.params
     const ref = db.collection('attendance_sessions').doc(sessionId)
@@ -654,9 +667,10 @@ app.get('/api/attendance/sessions/:sessionId/export', verifyIdTokenFromHeader, a
 // GET /api/attendance/sessions/:sessionId
 app.get('/api/attendance/sessions/:sessionId', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    if (!['teacher', 'admin'].includes(req.userRole)) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
+  if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
     const { sessionId } = req.params
     const ref = db.collection('attendance_sessions').doc(sessionId)
@@ -712,9 +726,10 @@ app.get(
   verifyIdTokenFromHeader,
   async (req, res) => {
     try {
-      if (!['teacher', 'admin'].includes(req.userRole)) {
-        return res.status(403).json({ error: 'Forbidden' })
-      }
+    if (!hasRole(req.userRole, ['teacher'])) {
+  return res.status(403).json({ error: 'Forbidden' })
+}
+
 
       const { sessionId } = req.params
       const snap = await db

@@ -336,25 +336,32 @@ app.post('/api/attendance/scan/:sessionId', verifyIdTokenFromHeader, async (req,
   }
 })
 
+
 // POST /api/attendance/sessions/:sessionId/close
-app.post('/api/attendance/sessions/:sessionId/close', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-    if (!['teacher', 'admin'].includes(req.userRole)) {
-      return res.status(403).json({ error: 'Forbidden' })
+app.post(
+  '/api/attendance/sessions/:sessionId/close',
+  verifyIdTokenFromHeader,
+  async (req, res) => {
+    try {
+      const { sessionId } = req.params
+
+      if (!['teacher', 'admin'].includes(req.userRole)) {
+        return res.status(403).json({ error: 'Forbidden' })
+      }
+
+      await db
+        .collection('attendance_sessions')
+        .doc(sessionId)
+        .update({ active: false })
+
+      res.json({ ok: true })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
     }
-
-    const { sessionId } = req.params
-
-    await db.collection('attendance_sessions')
-      .doc(sessionId)
-      .update({ active: false })
-
-    return res.json({ ok: true })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err.message })
   }
-})
+)
+
 
 
 // POST /api/classes/:classId/assignments
@@ -476,6 +483,83 @@ app.post(
   }
 )
 
+// POST /api/attendance/scan
+app.post(
+  '/api/attendance/scan',
+  verifyIdTokenFromHeader,
+  async (req, res) => {
+    try {
+      const { sessionId } = req.body
+      const uid = req.user.uid
+
+      const sessionSnap = await db
+        .collection('attendance_sessions')
+        .doc(sessionId)
+        .get()
+
+      if (!sessionSnap.exists) {
+        return res.status(404).json({ error: 'Session not found' })
+      }
+
+      const session = sessionSnap.data()
+      if (!session.active) {
+        return res.status(400).json({ error: 'Session closed' })
+      }
+
+      const recordId = `${sessionId}_${uid}`
+      const recordRef = db.collection('attendance_records').doc(recordId)
+
+      const exists = await recordRef.get()
+      if (exists.exists) {
+        return res.status(400).json({ error: 'Already checked in' })
+      }
+
+      await recordRef.set({
+        sessionId,
+        classId: session.classId,
+        uid,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      })
+
+      return res.json({ ok: true })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  }
+)
+
+
+// POST /api/classes/:classId/attendance/sessions
+app.post(
+  '/api/classes/:classId/attendance/sessions',
+  verifyIdTokenFromHeader,
+  async (req, res) => {
+    try {
+      const { classId } = req.params
+
+      if (!['teacher', 'admin'].includes(req.userRole)) {
+        return res.status(403).json({ error: 'Forbidden' })
+      }
+
+      const sessionRef = await db.collection('attendance_sessions').add({
+        classId,
+        createdBy: req.user.uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        active: true
+      })
+
+      return res.json({
+        ok: true,
+        sessionId: sessionRef.id,
+        qrUrl: `${process.env.FRONTEND_URL}/attendance/scan?session=${sessionRef.id}`
+      })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  }
+)
 
 
 /* ---------------------------------------------------------

@@ -45,6 +45,8 @@ export default function App() {
       } />
 
       <Route path="/attendance/scan" element={<AttendanceScan />} />
+      <Route path="/attendance/scan/:sessionId"element={<AttendanceScan />}/>
+
 
 
       {/* Instructor Dashboard */}

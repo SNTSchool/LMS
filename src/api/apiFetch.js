@@ -1,31 +1,27 @@
-// src/api/apiFetch.js
-import { auth } from '../firebaseConfig'
+import { getAuth } from 'firebase/auth'
 
-const API_BASE = import.meta.env.VITE_API_URL // e.g. https://your-backend.onrender.com
+const API_URL = import.meta.env.VITE_API_URL
 
 export default async function apiFetch(path, options = {}) {
+  const auth = getAuth()
   const user = auth.currentUser
-  if (!user) throw new Error('Not authenticated')
 
-  const token = await user.getIdToken()
-  const res = await fetch(`${API_BASE}${path}`, {
+  const headers = options.headers || {}
+
+  if (user) {
+    const token = await user.getIdToken()
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const res = await fetch(API_URL + path, {
     ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${token}`
-    }
+    headers
   })
 
-  // always return JSON or throw
-  const text = await res.text()
-  try {
-    const json = JSON.parse(text)
-    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
-    return json
-  } catch (e) {
-    // text is not json => treat as error message
-    if (!res.ok) throw new Error(text || `HTTP ${res.status}`)
-    // if ok but not json, return raw text
-    return text
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(text)
   }
+
+  return res.json()
 }

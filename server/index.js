@@ -84,13 +84,14 @@ app.get('/api/classes', authMiddleware, async (req, res) => {
     .where('members', 'array-contains', req.user.uid)
     .get()
 
-  const data = snap.docs.map(d => ({
+  const classes = snap.docs.map(d => ({
     id: d.id,
     ...d.data()
   }))
 
-  res.json(data)
+  res.json(classes) 
 })
+
 
 // create class
 app.post('/api/classes', authMiddleware, async (req, res) => {

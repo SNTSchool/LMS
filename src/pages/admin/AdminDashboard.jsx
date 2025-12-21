@@ -44,10 +44,10 @@ export default function AdminDashboard() {
         const email = document.getElementById('email').value
         //const password = 'tpstudent123'
         const role = document.getElementById('role').value
-        if (!uid || !email) {
-          Swal.showValidationMessage('ต้องกรอก UID และ Email')
+        if (!email) {
+          Swal.showValidationMessage('ต้องกรอก Email')
         }
-        return { uid, email, role }
+        return { email, role }
       }
     })
 

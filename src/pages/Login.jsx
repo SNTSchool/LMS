@@ -7,7 +7,6 @@ import { auth, googleProvider, db } from '../firebaseConfig'
 import { doc, getDoc } from 'firebase/firestore'
 import Swal from 'sweetalert2'
 import { useNavigate } from 'react-router-dom'
-import { FcGoogle } from 'react-icons/fc'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -15,7 +14,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  // ---------------- EMAIL / PASSWORD ----------------
+  /* ---------- EMAIL / PASSWORD ---------- */
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -27,7 +26,6 @@ export default function Login() {
         password
       )
 
-      // 🔒 เช็คว่ามี user ใน Firestore หรือไม่
       const snap = await getDoc(doc(db, 'users', cred.user.uid))
       if (!snap.exists()) {
         await Swal.fire({
@@ -58,13 +56,12 @@ export default function Login() {
     }
   }
 
-  // ---------------- GOOGLE LOGIN ----------------
+  /* ---------- GOOGLE LOGIN ---------- */
   const handleGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider)
       const user = result.user
 
-      // 🔒 เช็คสิทธิ์
       const snap = await getDoc(doc(db, 'users', user.uid))
       if (!snap.exists()) {
         await Swal.fire({
@@ -136,7 +133,31 @@ export default function Login() {
             onClick={handleGoogle}
             className="w-full flex items-center justify-center gap-3 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition font-medium"
           >
-            <FcGoogle size={22} />
+            {/* Google SVG Icon */}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 48 48"
+              className="bg-white rounded-full p-1"
+            >
+              <path
+                fill="#4285F4"
+                d="M24 9.5c3.54 0 6.03 1.53 7.41 2.81l5.45-5.45C33.47 3.86 28.97 1.5 24 1.5 14.84 1.5 6.91 6.89 3.25 14.68l6.36 4.94C11.28 13.02 17.19 9.5 24 9.5z"
+              />
+              <path
+                fill="#34A853"
+                d="M46.5 24.5c0-1.63-.15-3.2-.43-4.72H24v9.03h12.7c-.55 2.9-2.18 5.36-4.63 7.03l7.17 5.58C43.43 37.02 46.5 31.25 46.5 24.5z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M9.61 28.63A14.4 14.4 0 0 1 9 24c0-1.62.28-3.18.61-4.63l-6.36-4.94A23.97 23.97 0 0 0 1.5 24c0 3.87.92 7.53 2.75 10.57l6.36-4.94z"
+              />
+              <path
+                fill="#EA4335"
+                d="M24 46.5c6.48 0 11.91-2.14 15.88-5.78l-7.17-5.58c-1.99 1.33-4.53 2.13-8.71 2.13-6.81 0-12.72-3.52-15.36-8.71l-6.36 4.94C6.91 41.11 14.84 46.5 24 46.5z"
+              />
+            </svg>
+
             Sign in with Google
           </button>
         </div>

@@ -43,29 +43,15 @@ function genRoomCode(len = 6) {
   return s
 }
 
+// 🔓 TEMP: allow all (NO 401)
 async function verifyIdTokenFromHeader(req, res, next) {
-  const header = req.headers.authorization || ''
-  if (!header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing token' })
+  req.user = {
+    uid: 'dev-user',
+    email: 'dev@local'
   }
-
-  const idToken = header.split(' ')[1]
-
-  try {
-    const decoded = await auth.verifyIdToken(idToken)
-    req.user = decoded
-
-    // load role from users/{uid}
-    const uSnap = await db.doc(`users/${decoded.uid}`).get()
-    req.userRole = uSnap.exists ? uSnap.data().role : null
-
-    next()
-  } catch (err) {
-    console.error('AUTH ERROR:', err.message)
-    return res.status(401).json({ error: 'Invalid token' })
-  }
+  req.userRole = 'admin' // instructor / admin / student ก็ได้
+  next()
 }
-
 /* =========================================================
    ROUTES
 ========================================================= */

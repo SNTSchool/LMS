@@ -47,3 +47,14 @@ export default function ClassDetail() {
     </div>
   )
 }
+
+
+<CreateAttendanceButton classId={classId} />
+
+{currentSessionId && (
+  <>
+    <AttendanceList sessionId={currentSessionId} />
+    <AttendanceSessionPanel sessionId={currentSessionId} />
+  </>
+)}
+

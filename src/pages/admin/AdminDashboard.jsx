@@ -69,7 +69,7 @@ export default function AdminDashboard() {
         email: form.email,
         role: form.role,
         updatedAt: new Date()
-      }
+      })
       await Swal.fire({
         icon: 'success',
         title: 'บันทึกสำเร็จ',

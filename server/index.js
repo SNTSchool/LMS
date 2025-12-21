@@ -2,6 +2,8 @@
 import express from 'express'
 import cors from 'cors'
 import admin from 'firebase-admin'
+import multer from 'multer'
+const upload = multer({ storage: multer.memoryStorage() })
 
 /* =========================================================
    ENV CHECK
@@ -182,6 +184,78 @@ app.post('/api/classes/join', verifyIdTokenFromHeader, async (req, res) => {
     return res.status(500).json({ error: err.message })
   }
 })
+
+app.post('/api/classes/:id/assignments', verifyIdTokenFromHeader, async (req, res) => {
+  try {
+    if (!['teacher', 'admin'].includes(req.userRole)) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    const { title, description, dueAt, type } = req.body
+    const { id: classId } = req.params
+
+    const ref = await db
+      .collection(`classes/${classId}/assignments`)
+      .add({
+        title,
+        description,
+        type: type || 'file',
+        dueAt: dueAt ? new Date(dueAt) : null,
+        createdBy: req.user.uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      })
+
+    res.json({ ok: true, id: ref.id })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+
+
+
+app.post(
+  '/api/assignments/:assignmentId/submit',
+  verifyIdTokenFromHeader,
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const { assignmentId } = req.params
+      const uid = req.user.uid
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file' })
+      }
+
+      // upload to Drive
+      const driveRes = await drive.files.create({
+        requestBody: {
+          name: `${uid}_${req.file.originalname}`,
+          parents: ['DRIVE_ASSIGNMENT_FOLDER_ID']
+        },
+        media: {
+          mimeType: req.file.mimetype,
+          body: Buffer.from(req.file.buffer)
+        }
+      })
+
+      // save metadata
+      await db
+        .doc(`assignments/${assignmentId}/submissions/${uid}`)
+        .set({
+          studentId: uid,
+          driveFileId: driveRes.data.id,
+          fileName: req.file.originalname,
+          submittedAt: admin.firestore.FieldValue.serverTimestamp()
+        })
+
+      res.json({ ok: true })
+    } catch (e) {
+      res.status(500).json({ error: e.message })
+    }
+  }
+)
+
 
 /* ---------------------------------------------------------
    GET /api/classes/:classId

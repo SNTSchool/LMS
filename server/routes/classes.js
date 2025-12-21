@@ -1,30 +1,27 @@
 import express from 'express'
 import { verifyFirebaseToken } from '../middleware/auth.js'
-import admin from 'firebase-admin'
+import { db } from '../firebaseAdmin.js'
 
 const router = express.Router()
-const db = admin.firestore()
 
-router.get('/', authMiddleware, async (req, res) => {
-  try {
-    const uid = req.user.uid
+router.post('/', verifyFirebaseToken, async (req, res) => {
+  const { name } = req.body
 
-    const snap = await db
-      .collection('classes')
-      .where('members', 'array-contains', uid)
-      .get()
-
-    const classes = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    }))
-
-    return res.json(classes) // ⭐ array เท่านั้น
-  } catch (e) {
-    console.error(e)
-    return res.json([]) // ⭐ อย่าคืน object
+  if (!name) {
+    return res.status(400).json({ message: 'Missing class name' })
   }
-})
 
+  const code = generateClassCode() // aZ09 6 ตัว (case-sensitive)
+
+  const doc = await db.collection('classes').add({
+    name,
+    code,
+    instructors: [req.user.uid],
+    students: [],
+    createdAt: new Date()
+  })
+
+  res.json({ id: doc.id, code })
+})
 
 export default router

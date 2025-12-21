@@ -8,21 +8,37 @@ export default function Classes() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (loading || !user) return
+  if (loading || !user) return   
 
-    apiFetch('/api/classes')
-      .then(data => {
-        if (Array.isArray(data)) {
-          setClasses(data)
-        } else {
-          setClasses([])
+  const loadClasses = async () => {
+    try {
+      const token = await user.getIdToken()
+
+      const res = await fetch(`${API_URL}/api/classes`, {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
       })
-      .catch(err => {
-        setError(err.message)
+
+      const data = await res.json()
+
+      if (!Array.isArray(data)) {
+        console.error('Classes API returned:', data)
         setClasses([])
-      })
-  }, [loading, user])
+        return
+      }
+
+      setClasses(data)
+
+    } catch (err) {
+      console.error(err)
+      setClasses([])
+    }
+  }
+
+  loadClasses()
+}, [user, loading])
+
 
   if (loading) return <div>Loading...</div>
   if (error) return <div>Error: {error}</div>

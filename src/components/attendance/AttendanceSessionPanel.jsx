@@ -1,35 +1,13 @@
-import apiFetch from '../../api/apiFetch'
-
-export default function AttendanceSessionPanel({ sessionId, onClose }) {
-  const close = async () => {
-    await apiFetch(`/api/attendance/sessions/${sessionId}/close`, {
-      method: 'POST'
-    })
-    alert('Session closed')
-    onClose?.()
-  }
-
-  const exportCsv = () => {
-    window.open(
-      `${import.meta.env.VITE_API_URL}/api/attendance/sessions/${sessionId}/export`,
-      '_blank'
-    )
-  }
-
+// src/components/attendance/AttendanceSessionPanel.jsx
+export default function AttendanceSessionPanel({ onCreate }) {
   return (
-    <div className="flex gap-2 mt-3">
+    <div className="border rounded p-4 bg-gray-50">
+      <h3 className="font-semibold mb-2">เช็คชื่อประจำคาบ</h3>
       <button
-        onClick={close}
-        className="bg-red-600 text-white px-3 py-1 rounded"
+        onClick={onCreate}
+        className="px-3 py-2 bg-blue-600 text-white rounded"
       >
-        Close Session
-      </button>
-
-      <button
-        onClick={exportCsv}
-        className="bg-slate-600 text-white px-3 py-1 rounded"
-      >
-        Export CSV
+        สร้าง QR เช็คชื่อ
       </button>
     </div>
   )

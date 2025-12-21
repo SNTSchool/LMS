@@ -2,143 +2,57 @@
 import express from 'express'
 import cors from 'cors'
 import admin from 'firebase-admin'
-import multer from 'multer'
-import fs from 'fs'
-import { drive, ensureFolder } from './drive.js'
+import { authMiddleware } from './middleware/auth.js'
 
-const upload = multer({ dest: 'tmp/' })
-
-/* =========================================================
-   ENV CHECK
-========================================================= */
-if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-  console.error('❌ Missing FIREBASE_SERVICE_ACCOUNT env')
-  process.exit(1)
-}
-
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-
-/* =========================================================
-   Firebase Admin Init
-========================================================= */
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+    credential: admin.credential.applicationDefault()
   })
 }
 
 const db = admin.firestore()
-
-/* =========================================================
-   App Init
-========================================================= */
 const app = express()
+
 app.use(cors())
 app.use(express.json())
 
-function hasRole(userRole, allow = []) {
-  if (userRole === 'admin') return true
-  return allow.includes(userRole)
-}
-
-
-/* =========================================================
-   Helpers
-========================================================= */
-
-// generate case-sensitive class code
+/* ----------------------------------------
+   Utils
+---------------------------------------- */
 function genRoomCode(len = 6) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let s = ''
-  for (let i = 0; i < len; i++) {
-    s += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return s
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
-/**
- * 🔓 TEMP AUTH (DEV MODE)
- * - ไม่มี 401
- * - ทุก request ผ่าน
- * - แกล้งเป็น admin
- */
-function verifyIdTokenFromHeader(req, res, next) {
-  req.user = {
-    uid: 'dev-user-001',
-    email: 'dev@local'
-  }
-  req.userRole = 'admin' // admin / instructor / student
-  next()
-}
-
-/* =========================================================
-   ROUTES
-========================================================= */
-
-/* ---------------------------------------------------------
+/* ----------------------------------------
    GET /api/classes
-   - admin → เห็นทุกห้อง
-   - user → เห็นเฉพาะห้องที่เป็นสมาชิก
---------------------------------------------------------- */
-app.get('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
+---------------------------------------- */
+app.get('/api/classes', authMiddleware, async (req, res) => {
   try {
-    const uid = req.user.uid
-    const role = req.userRole
-
-    let snap
-
-    if (role === 'admin') {
-      snap = await db.collection('classes').get()
-    } else {
-      snap = await db
-        .collection('classes')
-        .where('members', 'array-contains', uid)
-        .get()
-    }
-
-    const classes = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    }))
-
-    return res.json(classes)
-  } catch (err) {
-    console.error('GET /classes error:', err)
-    return res.status(500).json({ error: err.message })
+    const snap = await db.collection('classes').get()
+    const classes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    res.json(classes)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: e.message })
   }
 })
 
-/* ---------------------------------------------------------
+/* ----------------------------------------
    POST /api/classes
-   สร้างห้องเรียน
---------------------------------------------------------- */
-app.post('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
+---------------------------------------- */
+app.post('/api/classes', authMiddleware, async (req, res) => {
   try {
-    if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
-
-
-    const { name, description } = req.body
-    if (!name) {
-      return res.status(400).json({ error: 'Missing name' })
+    if (!['teacher', 'admin'].includes(req.userRole)) {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
-    // generate unique code
-    let code, exists = true, attempt = 0
-    do {
-      code = genRoomCode(6)
-      const q = await db
-        .collection('classes')
-        .where('code', '==', code)
-        .limit(1)
-        .get()
+    const { name, description } = req.body
+    if (!name) return res.status(400).json({ error: 'Missing name' })
 
-      exists = !q.empty
-      attempt++
-    } while (exists && attempt < 10)
+    const code = genRoomCode()
 
-    const docRef = await db.collection('classes').add({
+    const ref = await db.collection('classes').add({
       name,
       description: description || '',
       code,
@@ -147,617 +61,58 @@ app.post('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     })
 
-    return res.json({
-      ok: true,
-      id: docRef.id,
-      code
-    })
-  } catch (err) {
-    console.error('POST /classes error:', err)
-    return res.status(500).json({ error: err.message })
-  }
-})
-
-/* ---------------------------------------------------------
-   POST /api/classes/join
-   เข้าเรียนด้วย code
---------------------------------------------------------- */
-app.post('/api/classes/join', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-    const { code } = req.body
-    if (!code) {
-      return res.status(400).json({ error: 'Missing code' })
-    }
-
-    const snap = await db
-      .collection('classes')
-      .where('code', '==', code)
-      .limit(1)
-      .get()
-
-    if (snap.empty) {
-      return res.status(404).json({ error: 'Class not found' })
-    }
-
-    const doc = snap.docs[0]
-
-    await doc.ref.update({
-      members: admin.firestore.FieldValue.arrayUnion(req.user.uid)
-    })
-
-    return res.json({
-      ok: true,
-      classId: doc.id
-    })
-  } catch (err) {
-    console.error('JOIN error:', err)
-    return res.status(500).json({ error: err.message })
-  }
-})
-
-app.post('/api/classes/:id/assignments', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-   if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
-
-
-    const { title, description, dueAt, type } = req.body
-    const { id: classId } = req.params
-
-    const ref = await db
-      .collection(`classes/${classId}/assignments`)
-      .add({
-        title,
-        description,
-        type: type || 'file',
-        dueAt: dueAt ? new Date(dueAt) : null,
-        createdBy: req.user.uid,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      })
-
-    res.json({ ok: true, id: ref.id })
+    res.json({ ok: true, id: ref.id, code })
   } catch (e) {
+    console.error(e)
     res.status(500).json({ error: e.message })
   }
 })
 
-
-
-
-app.post(
-  '/api/assignments/:assignmentId/submit',
-  verifyIdTokenFromHeader,
-  upload.single('file'),
-  async (req, res) => {
-    try {
-      const { assignmentId } = req.params
-      const uid = req.user.uid
-
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file' })
-      }
-
-      // upload to Drive
-      const driveRes = await drive.files.create({
-        requestBody: {
-          name: `${uid}_${req.file.originalname}`,
-          parents: ['DRIVE_ASSIGNMENT_FOLDER_ID']
-        },
-        media: {
-          mimeType: req.file.mimetype,
-          body: Buffer.from(req.file.buffer)
-        }
-      })
-
-      // save metadata
-      await db
-        .doc(`assignments/${assignmentId}/submissions/${uid}`)
-        .set({
-          studentId: uid,
-          driveFileId: driveRes.data.id,
-          fileName: req.file.originalname,
-          submittedAt: admin.firestore.FieldValue.serverTimestamp()
-        })
-
-      res.json({ ok: true })
-    } catch (e) {
-      res.status(500).json({ error: e.message })
-    }
-  }
-)
-
-// POST /api/attendance/sessions
-app.post('/api/attendance/sessions', verifyIdTokenFromHeader, async (req, res) => {
+/* ----------------------------------------
+   POST /api/classes/join
+---------------------------------------- */
+app.post('/api/classes/join', authMiddleware, async (req, res) => {
   try {
-   if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
+    const { code } = req.body
+    const snap = await db.collection('classes').where('code', '==', code).limit(1).get()
 
+    if (snap.empty) return res.status(404).json({ error: 'Not found' })
 
-    const { classId } = req.body
-    if (!classId) return res.status(400).json({ error: 'Missing classId' })
-
-    const expiresAt = admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + 15 * 60 * 1000) // 15 นาที
-    )
-
-    const ref = await db.collection('attendance_sessions').add({
-      classId,
-      createdBy: req.user.uid,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt,
-      active: true
+    const doc = snap.docs[0]
+    await doc.ref.update({
+      members: admin.firestore.FieldValue.arrayUnion(req.user.uid)
     })
 
-    return res.json({
-      ok: true,
-      sessionId: ref.id,
-      qrUrl: `${process.env.CLIENT_URL}/attendance/scan/${ref.id}`
-    })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err.message })
+    res.json({ ok: true, classId: doc.id })
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: e.message })
   }
 })
 
-// POST /api/attendance/scan/:sessionId
-app.post('/api/attendance/scan/:sessionId', verifyIdTokenFromHeader, async (req, res) => {
+/* ----------------------------------------
+   GET /api/classes/:id
+---------------------------------------- */
+app.get('/api/classes/:id', authMiddleware, async (req, res) => {
   try {
-    const { sessionId } = req.params
-    const uid = req.user.uid
-
-    const sRef = db.collection('attendance_sessions').doc(sessionId)
-    const sSnap = await sRef.get()
-
-    if (!sSnap.exists) {
-      return res.status(404).json({ error: 'Session not found' })
-    }
-
-    const s = sSnap.data()
-    if (!s.active) {
-      return res.status(400).json({ error: 'Session closed' })
-    }
-
-    if (s.expiresAt.toMillis() < Date.now()) {
-      await sRef.update({ active: false })
-      return res.status(400).json({ error: 'Session expired' })
-    }
-
-    const rRef = sRef.collection('records').doc(uid)
-    const rSnap = await rRef.get()
-
-    if (rSnap.exists) {
-      return res.status(409).json({ error: 'Already checked in' })
-    }
-
-    await rRef.set({
-      uid,
-      displayName: req.user.name || '',
-      email: req.user.email || '',
-      checkedAt: admin.firestore.FieldValue.serverTimestamp()
-    })
-
-    return res.json({ ok: true })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-
-// POST /api/attendance/sessions/:sessionId/close
-app.post(
-  '/api/attendance/sessions/:sessionId/close',
-  verifyIdTokenFromHeader,
-  async (req, res) => {
-    try {
-      const { sessionId } = req.params
-
-     if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
-
-
-      await db
-        .collection('attendance_sessions')
-        .doc(sessionId)
-        .update({ active: false })
-
-      res.json({ ok: true })
-    } catch (err) {
-      console.error(err)
-      res.status(500).json({ error: err.message })
-    }
-  }
-)
-
-
-
-// POST /api/classes/:classId/assignments
-app.post('/api/classes/:classId/assignments', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-   if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
-
-
-    const { classId } = req.params
-    const { title, description, type, dueAt } = req.body
-
-    if (!title || !type) {
-      return res.status(400).json({ error: 'Missing fields' })
-    }
-
-    const ref = db
-      .collection('classes')
-      .doc(classId)
-      .collection('assignments')
-
-    const doc = await ref.add({
-      title,
-      description: description || '',
-      type, // file | text | link
-      dueAt: dueAt ? admin.firestore.Timestamp.fromDate(new Date(dueAt)) : null,
-      teacherId: req.user.uid,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    })
-
-    res.json({ ok: true, id: doc.id })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// POST /api/classes/:classId/assignments/:assignmentId/submit
-app.post('/api/classes/:classId/assignments/:assignmentId/submit', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-    const { classId, assignmentId } = req.params
-    const { text, link, fileUrl } = req.body
-
-    const ref = db
-      .collection('classes')
-      .doc(classId)
-      .collection('assignments')
-      .doc(assignmentId)
-      .collection('submissions')
-      .doc(req.user.uid)
-
-    await ref.set({
-      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
-      text: text || null,
-      link: link || null,
-      fileUrl: fileUrl || null
-    })
-
-    res.json({ ok: true })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// POST /api/classes/:classId/assignments/:assignmentId/upload
-app.post(
-  '/api/classes/:classId/assignments/:assignmentId/upload',
-  verifyIdTokenFromHeader,
-  upload.single('file'),
-  async (req, res) => {
-    try {
-      const { classId, assignmentId } = req.params
-      const uid = req.user.uid
-      const file = req.file
-
-      if (!file) return res.status(400).json({ error: 'No file' })
-
-      // root LMS folder (hardcode once)
-      const LMS_FOLDER_ID = process.env.LMS_FOLDER_ID
-
-      const classFolder = await ensureFolder(classId, LMS_FOLDER_ID)
-      const assignFolder = await ensureFolder('Assignments', classFolder)
-      const thisAssign = await ensureFolder(assignmentId, assignFolder)
-      const userFolder = await ensureFolder(uid, thisAssign)
-
-      const uploaded = await drive.files.create({
-        resource: {
-          name: file.originalname,
-          parents: [userFolder]
-        },
-        media: {
-          mimeType: file.mimetype,
-          body: fs.createReadStream(file.path)
-        },
-        fields: 'id, webViewLink'
-      })
-
-      fs.unlinkSync(file.path)
-
-      // save to firestore
-      await db
-        .collection('classes')
-        .doc(classId)
-        .collection('assignments')
-        .doc(assignmentId)
-        .collection('submissions')
-        .doc(uid)
-        .set({
-          submittedAt: admin.firestore.FieldValue.serverTimestamp(),
-          fileUrl: uploaded.data.webViewLink
-        })
-
-      res.json({ ok: true, url: uploaded.data.webViewLink })
-    } catch (err) {
-      console.error(err)
-      res.status(500).json({ error: err.message })
-    }
-  }
-)
-
-// POST /api/attendance/scan
-app.post(
-  '/api/attendance/scan',
-  verifyIdTokenFromHeader,
-  async (req, res) => {
-    try {
-      const { sessionId } = req.body
-      const uid = req.user.uid
-
-      const sessionSnap = await db
-        .collection('attendance_sessions')
-        .doc(sessionId)
-        .get()
-
-      if (!sessionSnap.exists) {
-        return res.status(404).json({ error: 'Session not found' })
-      }
-
-      const session = sessionSnap.data()
-      if (!session.active) {
-        return res.status(400).json({ error: 'Session closed' })
-      }
-
-      const recordId = `${sessionId}_${uid}`
-      const recordRef = db.collection('attendance_records').doc(recordId)
-
-      const exists = await recordRef.get()
-      if (exists.exists) {
-        return res.status(400).json({ error: 'Already checked in' })
-      }
-
-      await recordRef.set({
-        sessionId,
-        classId: session.classId,
-        uid,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
-      })
-
-      return res.json({ ok: true })
-    } catch (err) {
-      console.error(err)
-      res.status(500).json({ error: err.message })
-    }
-  }
-)
-
-
-// POST /api/classes/:classId/attendance/sessions
-app.post(
-  '/api/classes/:classId/attendance/sessions',
-  verifyIdTokenFromHeader,
-  async (req, res) => {
-    try {
-      const { classId } = req.params
-
-     if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
-
-
-      const sessionRef = await db.collection('attendance_sessions').add({
-        classId,
-        createdBy: req.user.uid,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        active: true
-      })
-
-      return res.json({
-        ok: true,
-        sessionId: sessionRef.id,
-        qrUrl: `${process.env.FRONTEND_URL}/attendance/scan?session=${sessionRef.id}`
-      })
-    } catch (err) {
-      console.error(err)
-      res.status(500).json({ error: err.message })
-    }
-  }
-)
-
-
-/* ---------------------------------------------------------
-   GET /api/classes/:classId
-   หน้า classroom จริง
---------------------------------------------------------- */
-app.get('/api/classes/:classId', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-    const { classId } = req.params
-
-    const ref = db.collection('classes').doc(classId)
+    const ref = db.collection('classes').doc(req.params.id)
     const snap = await ref.get()
 
-    if (!snap.exists) {
-      return res.status(404).json({ error: 'Class not found' })
-    }
+    if (!snap.exists) return res.status(404).json({ error: 'Not found' })
 
-    const klass = snap.data()
-    const uid = req.user.uid
-    const role = req.userRole
+    const data = snap.data()
 
-    const isTeacher = Array.isArray(klass.teacherIds) && klass.teacherIds.includes(uid)
-    const isMember = Array.isArray(klass.members) && klass.members.includes(uid)
-
-    if (!(isTeacher || isMember || role === 'admin')) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
-
-    // SAFE: subcollections (ไม่มี = empty)
-    const assignmentsSnap = await ref.collection('assignments').get()
-    const filesSnap = await ref.collection('files').get()
-
-    let sessions = []
-    try {
-      const sessSnap = await db
-        .collection('attendance_sessions')
-        .where('classId', '==', classId)
-        .get()
-
-      sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-    } catch {
-      sessions = []
-    }
-
-    return res.json({
-      klass: { id: classId, ...klass },
-      assignments: assignmentsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-      files: filesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-      sessions
+    res.json({
+      klass: { id: snap.id, ...data },
+      assignments: [],
+      attendanceSessions: [],
+      files: []
     })
-  } catch (err) {
-    console.error('CLASS DETAIL error:', err)
-    return res.status(500).json({ error: err.message })
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: e.message })
   }
 })
 
-// GET /api/attendance/sessions/:sessionId/export
-app.get('/api/attendance/sessions/:sessionId/export', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-  if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
-
-
-    const { sessionId } = req.params
-    const ref = db.collection('attendance_sessions').doc(sessionId)
-    const snap = await ref.get()
-
-    if (!snap.exists) {
-      return res.status(404).json({ error: 'Session not found' })
-    }
-
-    const recordsSnap = await ref.collection('records').get()
-
-    let csv = 'uid,name,email,checkedAt\n'
-
-    recordsSnap.forEach(doc => {
-      const r = doc.data()
-      csv += `${doc.id},"${r.displayName || ''}","${r.email || ''}",${r.checkedAt?.toDate().toISOString()}\n`
-    })
-
-    res.setHeader('Content-Type', 'text/csv')
-    res.setHeader('Content-Disposition', `attachment; filename="attendance-${sessionId}.csv"`)
-
-    return res.send(csv)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-
-// GET /api/attendance/sessions/:sessionId
-app.get('/api/attendance/sessions/:sessionId', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-  if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
-
-
-    const { sessionId } = req.params
-    const ref = db.collection('attendance_sessions').doc(sessionId)
-    const snap = await ref.get()
-
-    if (!snap.exists) {
-      return res.status(404).json({ error: 'Session not found' })
-    }
-
-    const recordsSnap = await ref.collection('records')
-      .orderBy('checkedAt', 'asc')
-      .get()
-
-    const records = recordsSnap.docs.map(d => ({
-      uid: d.id,
-      ...d.data()
-    }))
-
-    return res.json(records)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// GET /api/classes/:classId/assignments
-app.get('/api/classes/:classId/assignments', verifyIdTokenFromHeader, async (req, res) => {
-  try {
-    const { classId } = req.params
-
-    const snap = await db
-      .collection('classes')
-      .doc(classId)
-      .collection('assignments')
-      .orderBy('createdAt', 'desc')
-      .get()
-
-    const assignments = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    }))
-
-    res.json(assignments)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// GET /api/attendance/sessions/:sessionId/export
-app.get(
-  '/api/attendance/sessions/:sessionId/export',
-  verifyIdTokenFromHeader,
-  async (req, res) => {
-    try {
-    if (!hasRole(req.userRole, ['teacher'])) {
-  return res.status(403).json({ error: 'Forbidden' })
-}
-
-
-      const { sessionId } = req.params
-      const snap = await db
-        .collection('attendance_records')
-        .where('sessionId', '==', sessionId)
-        .get()
-
-      let csv = 'uid,timestamp\n'
-      snap.forEach(d => {
-        const r = d.data()
-        csv += `${r.uid},${r.timestamp?.toDate?.() || ''}\n`
-      })
-
-      res.setHeader('Content-Type', 'text/csv')
-      res.send(csv)
-    } catch (err) {
-      console.error(err)
-      res.status(500).json({ error: err.message })
-    }
-  }
-)
-
-
-
-/* =========================================================
-   START SERVER
-========================================================= */
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => {
-  console.log('🚀 Server running on port', PORT)
-})
+app.listen(PORT, () => console.log('Server running on', PORT))

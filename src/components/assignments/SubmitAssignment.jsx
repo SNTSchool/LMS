@@ -1,36 +1,34 @@
 import { useState } from 'react'
 import apiFetch from '../../api/apiFetch'
 
-export default function SubmitAssignment({ assignmentId }) {
+export default function SubmitAssignment({ classId, assignmentId }) {
   const [file, setFile] = useState(null)
 
-  const submit = async e => {
-    e.preventDefault()
-    if (!file) return
+  const submit = async () => {
+    const form = new FormData()
+    form.append('file', file)
 
-    const fd = new FormData()
-    fd.append('file', file)
+    await apiFetch(
+      `/api/classes/${classId}/assignments/${assignmentId}/upload`,
+      {
+        method: 'POST',
+        body: form,
+        headers: {} // ⚠️ ห้ามใส่ Content-Type
+      }
+    )
 
-    await apiFetch(`/api/assignments/${assignmentId}/submit`, {
-      method: 'POST',
-      body: fd
-    })
-
-    alert('Submitted')
+    alert('ส่งงานแล้ว')
   }
 
   return (
-    <form onSubmit={submit} className="border p-4 rounded">
-      <input
-        type="file"
-        onChange={e => setFile(e.target.files[0])}
-      />
+    <div className="mt-2">
+      <input type="file" onChange={e => setFile(e.target.files[0])} />
       <button
-        type="submit"
-        className="bg-green-600 text-white px-4 py-2 rounded ml-2"
+        onClick={submit}
+        className="ml-2 px-3 py-1 bg-green-600 text-white rounded"
       >
-        Submit
+        ส่งงาน
       </button>
-    </form>
+    </div>
   )
 }

@@ -1,116 +1,172 @@
+// server/index.js
 import express from 'express'
 import cors from 'cors'
-import multer from 'multer'
 import admin from 'firebase-admin'
 
-/* ===== Firebase Admin ===== */
+/*
+REQUIRED ENV:
+- FIREBASE_SERVICE_ACCOUNT (JSON string)
+*/
+
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.error('Missing FIREBASE_SERVICE_ACCOUNT env')
+  process.exit(1)
+}
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+
 admin.initializeApp({
-  credential: admin.credential.cert(
-    JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-  )
+  credential: admin.credential.cert(serviceAccount)
 })
-
 const db = admin.firestore()
+const auth = admin.auth()
 
-/* ===== App ===== */
 const app = express()
 app.use(cors())
 app.use(express.json())
 
-const upload = multer({ storage: multer.memoryStorage() })
+/* ---------- Helpers ---------- */
+function genRoomCode(len = 6) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let s = ''
+  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)]
+  return s
+}
 
-/* ===== Auth Middleware ===== */
-async function authMiddleware(req, res, next) {
-  const header = req.headers.authorization
-  if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Invalid token' })
-  }
-
+async function verifyIdTokenFromHeader(req, res, next) {
+  const header = req.headers.authorization || ''
+  if (!header.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing token' })
+  const idToken = header.split(' ')[1]
   try {
-    const token = header.split(' ')[1]
-    const decoded = await admin.auth().verifyIdToken(token)
+    const decoded = await auth.verifyIdToken(idToken)
     req.user = decoded
+    // load role from users/{uid}
+    const udoc = await db.doc(`users/${decoded.uid}`).get()
+    req.userRole = udoc.exists ? udoc.data().role : null
     next()
   } catch (err) {
     return res.status(401).json({ error: 'Invalid token' })
   }
 }
 
-/* ===== Role Check ===== */
-async function adminOnly(req, res, next) {
-  const snap = await db.doc(`users/${req.user.uid}`).get()
-  if (!snap.exists || snap.data().role !== 'admin') {
-    return res.status(403).json({ error: 'Forbidden' })
-  }
-  next()
-}
-
-/* ===== Admin Create User ===== */
-app.post('/api/admin/create-user', authMiddleware, adminOnly, async (req, res) => {
-  const { email, password, role } = req.body
-
+/* ---------- Create class (instructor/admin) ---------- */
+/*
+POST /api/classes
+body: { name, description }
+returns: { ok: true, id, code }
+*/
+app.post('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    const user = await admin.auth().createUser({
-      email,
-      password
+    const role = req.userRole
+    if (!['instructor', 'admin'].includes(role)) return res.status(403).json({ error: 'Forbidden' })
+
+    const { name, description } = req.body
+    if (!name) return res.status(400).json({ error: 'Missing name' })
+
+    // ensure code unique (retry loop)
+    let code, exists = true, attempt = 0
+    do {
+      code = genRoomCode(6)
+      const q = await db.collection('classes').where('code', '==', code).limit(1).get()
+      exists = !q.empty
+      attempt++
+      if (attempt > 10) break
+    } while (exists)
+
+    const docRef = await db.collection('classes').add({
+      name,
+      description: description || '',
+      teacherIds: [req.user.uid],   // at least one teacher
+      members: [req.user.uid],      // owner included
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      code,                         // case-sensitive code
     })
 
-    await db.doc(`users/${user.uid}`).set({
-      email,
-      role,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    })
-
-    res.json({ success: true, uid: user.uid })
+    return res.json({ ok: true, id: docRef.id, code })
   } catch (err) {
-    res.status(400).json({ error: err.message })
+    console.error(err)
+    return res.status(500).json({ error: err.message })
   }
 })
 
-/* ===== Example Upload (Google Drive จะต่อเพิ่มได้) ===== */
-app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
-  res.json({
-    filename: req.file.originalname,
-    uid: req.user.uid
-  })
+/* ---------- Join by code ---------- */
+/*
+POST /api/classes/join
+body: { code }
+requires auth
+If found, adds user uid to members array (if not exist) and returns classId
+*/
+app.post('/api/classes/join', verifyIdTokenFromHeader, async (req, res) => {
+  try {
+    const { code } = req.body
+    if (!code) return res.status(400).json({ error: 'Missing code' })
+
+    // case-sensitive query (Firestore queries are case-sensitive)
+    const snap = await db.collection('classes').where('code', '==', code).limit(1).get()
+    if (snap.empty) return res.status(404).json({ error: 'Class not found' })
+
+    const cDoc = snap.docs[0]
+    const cData = cDoc.data()
+    const classId = cDoc.id
+
+    // ensure user is not already member
+    const uid = req.user.uid
+    const members = cData.members || []
+    if (!members.includes(uid)) {
+      await db.collection('classes').doc(classId).update({
+        members: admin.firestore.FieldValue.arrayUnion(uid)
+      })
+    }
+
+    return res.json({ ok: true, classId })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  }
 })
 
-/* ===== Classes ===== */
+/* ---------- Get class detail (only teacher/admin or member) ---------- */
+/*
+GET /api/classes/:classId
+returns class doc + assignments + sessions + files metadata
+*/
+app.get('/api/classes/:classId', verifyIdTokenFromHeader, async (req, res) => {
+  try {
+    const { classId } = req.params
+    const cSnap = await db.collection('classes').doc(classId).get()
+    if (!cSnap.exists) return res.status(404).json({ error: 'Class not found' })
+    const c = cSnap.data()
 
-// list classes
-app.get('/api/classes', authMiddleware, async (req, res) => {
-  const snap = await db
-    .collection('classes')
-    .where('members', 'array-contains', req.user.uid)
-    .get()
+    const uid = req.user.uid
+    const role = req.userRole
 
-  const classes = snap.docs.map(d => ({
-    id: d.id,
-    ...d.data()
-  }))
+    // allow if teacher (in teacherIds), admin, or member
+    const isTeacher = Array.isArray(c.teacherIds) && c.teacherIds.includes(uid)
+    const isMember = Array.isArray(c.members) && c.members.includes(uid)
+    if (!(isTeacher || isMember || role === 'admin')) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
 
-  res.json(classes) 
+    // fetch subcollections (assignments, sessions, files metadata)
+    const [assignSnap, sessSnap, filesSnap] = await Promise.all([
+      db.collection(`classes/${classId}/assignments`).orderBy('createdAt', 'desc').get(),
+      db.collection('attendance_sessions').where('classId', '==', classId).orderBy('createdAt', 'desc').get(),
+      db.collection(`classes/${classId}/files`).orderBy('createdAt', 'desc').get()
+    ])
+
+    const assignments = assignSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const files = filesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+
+    return res.json({ klass: { id: classId, ...c }, assignments, sessions, files })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  }
 })
 
+/* ---------- Optional: create QR link helper (returns attend URL for session) ---------- */
+/* You already have sessions endpoints; simply create session then QR points to /attendance/scan?session=ID&classId=ID */
 
-// create class
-app.post('/api/classes', authMiddleware, async (req, res) => {
-  const { name, section } = req.body
-
-  const doc = await db.collection('classes').add({
-    name,
-    section,
-    owner: req.user.uid,
-    members: [req.user.uid],
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
-  })
-
-  res.json({ id: doc.id })
-})
-
-
-/* ===== Start ===== */
-const PORT = process.env.PORT || 3001
-app.listen(PORT, () => {
-  console.log('Backend running on port', PORT)
-})
+/* ---------- Start ---------- */
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => console.log('Server listening on', PORT))

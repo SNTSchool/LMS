@@ -46,6 +46,14 @@ export default function App() {
 
       <Route path="/attendance/scan" element={<AttendanceScan />} />
       <Route path="/attendance/scan/:sessionId"element={<AttendanceScan />}/>
+      <Route
+        path="/classes/:id"
+        element={
+          <ProtectedRoute allow={['student', 'teacher']}>
+            <Classroom />
+          </ProtectedRoute>
+        }
+      />
 
 
 

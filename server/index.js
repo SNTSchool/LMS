@@ -3,10 +3,9 @@ import express from 'express'
 import cors from 'cors'
 import admin from 'firebase-admin'
 
-/*
-REQUIRED ENV:
-- FIREBASE_SERVICE_ACCOUNT (JSON string)
-*/
+/* =========================================================
+   Firebase Admin Init
+========================================================= */
 
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   console.error('Missing FIREBASE_SERVICE_ACCOUNT env')
@@ -15,7 +14,6 @@ if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
 
-/* ---------- Firebase Admin Init (safe) ---------- */
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
@@ -23,9 +21,11 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore()
-const auth = admin.auth()
 
-/* ---------- App ---------- */
+/* =========================================================
+   App
+========================================================= */
+
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -43,68 +43,39 @@ function genRoomCode(len = 6) {
   return s
 }
 
-// 🔓 TEMP: allow all (NO 401)
-async function verifyIdTokenFromHeader(req, res, next) {
-  req.user = {
-    uid: 'dev-user',
-    email: 'dev@local'
-  }
-  req.userRole = 'admin' // instructor / admin / student ก็ได้
+// 🔓 TEMP AUTH — allow everything
+function verifyIdTokenFromHeader(req, res, next) {
+  req.user = { uid: 'dev-user', email: 'dev@local' }
+  req.userRole = 'admin'
   next()
 }
+
 /* =========================================================
    ROUTES
 ========================================================= */
 
 /* ---------------------------------------------------------
-   GET /api/classes   ⭐⭐⭐ (สำคัญมาก)
-   ดึงห้องเรียนที่ user เป็นสมาชิก / ครู
+   GET /api/classes
 --------------------------------------------------------- */
 app.get('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    const uid = req.user.uid
-    const role = req.userRole
-
-    let classes = []
-
-    if (role === 'admin') {
-      // admin เห็นทุกห้อง
-      const snap = await db.collection('classes')
-        .orderBy('createdAt', 'desc')
-        .get()
-
-      classes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    } else {
-      // teacher / student เห็นเฉพาะที่เข้าร่วม
-      const snap = await db.collection('classes')
-        .where('members', 'array-contains', uid)
-        .orderBy('createdAt', 'desc')
-        .get()
-
-      classes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    }
-
+    const snap = await db.collection('classes').get()
+    const classes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     return res.json(classes)
   } catch (err) {
-    console.error(err)
+    console.error('GET /api/classes:', err)
     return res.status(500).json({ error: err.message })
   }
 })
 
 /* ---------------------------------------------------------
    POST /api/classes
-   สร้างห้องเรียน (instructor / admin เท่านั้น)
 --------------------------------------------------------- */
 app.post('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
   try {
-    if (!['instructor', 'admin'].includes(req.userRole)) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
-
     const { name, description } = req.body
     if (!name) return res.status(400).json({ error: 'Missing name' })
 
-    // generate unique code
     let code, exists = true, attempt = 0
     do {
       code = genRoomCode(6)
@@ -112,7 +83,6 @@ app.post('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
         .where('code', '==', code)
         .limit(1)
         .get()
-
       exists = !q.empty
       attempt++
     } while (exists && attempt < 10)
@@ -120,26 +90,21 @@ app.post('/api/classes', verifyIdTokenFromHeader, async (req, res) => {
     const docRef = await db.collection('classes').add({
       name,
       description: description || '',
-      code,                         // case-sensitive
-      teacherIds: [req.user.uid],   // ต้องมีครูอย่างน้อย 1
-      members: [req.user.uid],      // owner เป็น member
+      code,
+      teacherIds: ['dev-user'],
+      members: ['dev-user'],
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     })
 
-    return res.json({
-      ok: true,
-      id: docRef.id,
-      code
-    })
+    return res.json({ ok: true, id: docRef.id, code })
   } catch (err) {
-    console.error(err)
+    console.error('POST /api/classes:', err)
     return res.status(500).json({ error: err.message })
   }
 })
 
 /* ---------------------------------------------------------
    POST /api/classes/join
-   เข้าห้องเรียนด้วย code
 --------------------------------------------------------- */
 app.post('/api/classes/join', verifyIdTokenFromHeader, async (req, res) => {
   try {
@@ -156,27 +121,24 @@ app.post('/api/classes/join', verifyIdTokenFromHeader, async (req, res) => {
     }
 
     const doc = snap.docs[0]
-    const uid = req.user.uid
 
     await doc.ref.update({
-      members: admin.firestore.FieldValue.arrayUnion(uid)
+      members: admin.firestore.FieldValue.arrayUnion(req.user.uid)
     })
 
     return res.json({ ok: true, classId: doc.id })
   } catch (err) {
-    console.error(err)
+    console.error('JOIN CLASS:', err)
     return res.status(500).json({ error: err.message })
   }
 })
 
 /* ---------------------------------------------------------
    GET /api/classes/:classId
-   เข้าหน้าห้องเรียนจริง
 --------------------------------------------------------- */
 app.get('/api/classes/:classId', verifyIdTokenFromHeader, async (req, res) => {
   try {
     const { classId } = req.params
-
     const cRef = db.collection('classes').doc(classId)
     const cSnap = await cRef.get()
 
@@ -186,54 +148,35 @@ app.get('/api/classes/:classId', verifyIdTokenFromHeader, async (req, res) => {
 
     const c = cSnap.data()
 
-    // 🔒 (คุณ bypass แล้ว แต่คงไว้)
-    const uid = req.user.uid
-    const role = req.userRole
-
-    const isTeacher = Array.isArray(c.teacherIds) && c.teacherIds.includes(uid)
-    const isMember = Array.isArray(c.members) && c.members.includes(uid)
-    if (!(isTeacher || isMember || role === 'admin')) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
-
-    // ✅ SAFE FETCH (ถ้าไม่มีจะได้ empty array)
     const assignmentsSnap = await cRef.collection('assignments').get()
     const filesSnap = await cRef.collection('files').get()
 
-   let sessions = []
-
-try {
-  const sessSnap = await db
-    .collection('attendance_sessions')
-    .where('classId', '==', classId)
-    .get()
-
-  sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-} catch (e) {
-  console.warn('attendance_sessions not ready yet')
-  sessions = []
-}
-
-    const assignments = assignmentsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-    const files = filesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    let sessions = []
+    try {
+      const sessSnap = await db.collection('attendance_sessions')
+        .where('classId', '==', classId)
+        .get()
+      sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    } catch {
+      sessions = []
+    }
 
     return res.json({
       klass: { id: classId, ...c },
-      assignments,
-      sessions,
-      files
+      assignments: assignmentsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      files: filesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      sessions
     })
-
   } catch (err) {
-    console.error('CLASS DETAIL ERROR:', err)
+    console.error('CLASS DETAIL:', err)
     return res.status(500).json({ error: err.message })
   }
 })
 
-
 /* =========================================================
-   Start Server
+   Start
 ========================================================= */
+
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log('Server listening on', PORT)

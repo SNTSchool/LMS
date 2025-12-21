@@ -1,8 +1,10 @@
-// src/pages/admin/AdminDashboard.jsx
 import React, { useEffect, useState } from 'react'
 import { collection, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore'
-import { db } from '../../firebaseConfig'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { db, auth } from '../../firebaseConfig'
 import Swal from 'sweetalert2'
+
+
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([])
@@ -28,7 +30,6 @@ export default function AdminDashboard() {
     const { value: form } = await Swal.fire({
       title: 'สร้าง / แก้ไขผู้ใช้',
       html: `
-        <input id="uid" class="swal2-input" placeholder="UID (จาก Firebase Auth)">
         <input id="email" class="swal2-input" placeholder="Email">
         <select id="role" class="swal2-input">
           <option value="student">student</option>
@@ -38,8 +39,10 @@ export default function AdminDashboard() {
       `,
       focusConfirm: false,
       preConfirm: () => {
-        const uid = document.getElementById('uid').value
+        
+        //const uid = document.getElementById('uid').value
         const email = document.getElementById('email').value
+        //const password = 'tpstudent123'
         const role = document.getElementById('role').value
         if (!uid || !email) {
           Swal.showValidationMessage('ต้องกรอก UID และ Email')
@@ -51,7 +54,12 @@ export default function AdminDashboard() {
     if (!form) return
 
     try {
-      await setDoc(doc(db, 'users', form.uid), {
+      const password = 'tpstudent123'
+      createUserWithEmailAndPassword(auth, form.email, password)
+      .then((userCredential) => {
+        const user = userCredential.user;
+        const uid = user.uid
+        await setDoc(doc(db, 'users', uid), {
         email: form.email,
         role: form.role,
         updatedAt: new Date()
@@ -63,6 +71,8 @@ export default function AdminDashboard() {
         showConfirmButton: false
       })
       loadUsers()
+      })
+      
     } catch (err) {
       Swal.fire({
         icon: 'error',

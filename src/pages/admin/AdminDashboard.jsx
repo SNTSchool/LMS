@@ -55,14 +55,15 @@ export default function AdminDashboard() {
 
     try {
       const password = 'tpstudent123'
-      createUserWithEmailAndPassword(auth, form.email, password)
-      if (!userCredential) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ผิดพลาด',
-          text: 'ระบบไม่สร้างบัญชี'
-        })
-      }
+      await createUserWithEmailAndPassword(auth, form.email, password)
+       if (!userCredential || !userCredential.user) {
+          await Swal.fire({
+            icon: 'error',
+            title: 'ผิดพลาด',
+            text: 'ระบบไม่สามารถสร้างบัญชีผู้ใช้ได้'
+          })
+          return
+        }
       const user = userCredential.user;
       const uid = user.uid
       await setDoc(doc(db, 'users', uid), {

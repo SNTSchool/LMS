@@ -33,7 +33,10 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Public */}
+      {/* Public  <Route path="/attendance/scan" element={<AttendanceScan />} />
+      <Route path="/attendance/scan/:sessionId"element={<AttendanceScan />}/>
+      
+      */}
       <Route path="/login" element={<Login />} />
 
       {/* Home */}
@@ -45,8 +48,7 @@ export default function App() {
         </ProtectedRoute>
       } />
 
-      <Route path="/attendance/scan" element={<AttendanceScan />} />
-      <Route path="/attendance/scan/:sessionId"element={<AttendanceScan />}/>
+      
       <Route
         path="/classes/:id"
         element={

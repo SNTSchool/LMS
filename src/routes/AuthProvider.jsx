@@ -1,7 +1,7 @@
 // src/routes/AuthProvider.jsx
 import { createContext, useContext, useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
-import { auth } from 'firebase'
+import { auth } from '../firebaseConfig'
 import apiFetch from '../api/apiFetch'
 
 const AuthContext = createContext()

@@ -4,8 +4,9 @@ import { auth } from '../firebase'
 import { useAuth } from '../routes/AuthProvider'
 
 export default function Sidebar() {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const navigate = useNavigate()
+  const role = userData?.role
 
   const logout = async () => {
     await signOut(auth)
@@ -13,34 +14,38 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-white border-r p-4 space-y-4">
-      <div className="font-bold text-lg">
+    <aside className="w-64 bg-slate-900 text-white flex flex-col">
+      <div className="p-4 font-bold text-lg border-b border-white/10">
         Learning Management System
       </div>
 
-      <nav className="space-y-2 text-sm">
-        <Link to="/classes" className="block hover:underline">
+      <nav className="flex-1 p-4 space-y-2 text-sm">
+        <Link to="/classes" className="block hover:bg-white/10 p-2 rounded">
           ห้องเรียน
         </Link>
 
-        <Link to="/assignments" className="block hover:underline">
-          งาน / Assignment
+        <Link to="/assignments" className="block hover:bg-white/10 p-2 rounded">
+          งาน / Assignments
         </Link>
 
-        {/* ตอนนั้นยังมี attendance แยก */}
-        <Link to="/attendance" className="block hover:underline">
-          เช็คชื่อ
-        </Link>
+        {(role === 'teacher' || role === 'admin') && (
+          <Link to="/reports" className="block hover:bg-white/10 p-2 rounded">
+            Reports
+          </Link>
+        )}
+
+        {role === 'admin' && (
+          <Link to="/admin" className="block hover:bg-white/10 p-2 rounded">
+            Admin
+          </Link>
+        )}
       </nav>
 
-      <div className="pt-4 border-t text-xs">
-        <div className="mb-2 text-gray-600">
-          {user?.email}
-        </div>
-
+      <div className="p-4 border-t border-white/10 text-xs">
+        <div className="mb-2 truncate">{user?.email}</div>
         <button
           onClick={logout}
-          className="text-red-600 hover:underline"
+          className="w-full bg-red-600 hover:bg-red-700 text-white py-1 rounded"
         >
           ออกจากระบบ
         </button>

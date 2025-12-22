@@ -1,130 +1,33 @@
-// src/App.jsx
-import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-
+import Sidebar from './components/Sidebar'
+import Classes from './pages/Classes'
+import CreateClass from './pages/CreateClass'
 import Login from './pages/Login'
-import StudentDashboard from './pages/StudentDashboard'
-import InstructorDashboard from './pages/InstructorDashboard'
-import AdminDashboard from './pages/admin/AdminDashboard'
-
 import { useAuth } from './routes/AuthProvider'
-import { AuthProvider } from './routes/AuthProvider'
-import ProtectedRoute from './routes/ProtectedRoute'
-import Layout from './components/Layout'
-
-import ClubsPage from './features/clubs/ClubList'
-
-// Classroom
-import ClassList from './features/classroom/ClassList'
-import ClassDetail from './features/classroom/ClassDetail'
-
-// Attendance
-import TeacherSession from './features/attendance/TeacherSession'
-import StudentScanner from './features/attendance/StudentScanner'
 
 export default function App() {
   const { user, loading } = useAuth()
 
-  if (loading) {
+  if (loading) return null
+
+  if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">Loading...</div>
+      <Routes>
+        <Route path="*" element={<Login />} />
+      </Routes>
     )
   }
 
   return (
-    <Routes>
-      {/* Public  <Route path="/attendance/scan" element={<AttendanceScan />} />
-      <Route path="/attendance/scan/:sessionId"element={<AttendanceScan />}/>
-      
-      */}
-      <Route path="/login" element={<Login />} />
-
-      {/* Home */}
-      <Route path="/" element={
-        <ProtectedRoute>
-          <Layout>
-            <StudentDashboard />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      
-      <Route
-        path="/classes/:id"
-        element={
-          <ProtectedRoute allow={['student', 'teacher']}>
-            <Classroom />
-          </ProtectedRoute>
-        }
-      />
-
-
-
-      {/* Instructor Dashboard */}
-      <Route path="/instructor" element={
-        <ProtectedRoute>
-          <Layout>
-            <InstructorDashboard />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Admin */}
-      <Route path="/admin" element={
-        <ProtectedRoute>
-          <Layout>
-            <AdminDashboard />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Classes list */}
-      <Route path="/classes" element={
-        <ProtectedRoute>
-          <Layout>
-            <ClassList />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Class detail (assignments + sessions) */}
-      <Route path="/classes/:classId" element={
-        <ProtectedRoute>
-          <Layout>
-            <ClassDetail />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Clubs */}
-      <Route path="/clubs" element={
-        <ProtectedRoute>
-          <Layout>
-            <ClubsPage />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Attendance - Instructor (Create QR) */}
-      <Route path="/attendance/create" element={
-        <ProtectedRoute>
-          <Layout>
-            <TeacherSession />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Attendance - Student (Scan QR) */}
-      <Route path="/attendance/scan" element={
-        <ProtectedRoute>
-          <Layout>
-            <StudentScanner />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Fallback: let browser/router handle */}
-      <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />
-    </Routes>
+    <div className="flex">
+      <Sidebar />
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<Navigate to="/classes" />} />
+          <Route path="/classes" element={<Classes />} />
+          <Route path="/classes/create" element={<CreateClass />} />
+        </Routes>
+      </main>
+    </div>
   )
 }

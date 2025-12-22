@@ -1,29 +1,33 @@
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
-import { auth } from '../firebase'
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth'
+import { auth, googleProvider } from '../firebase'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-
-const location = useLocation()
-const navigate = useNavigate()
-const from = location.state?.from?.pathname || '/classes'
-
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const from = location.state?.from?.pathname || '/classes'
 
   const loginEmail = async () => {
-   await signInWithEmailAndPassword(auth, email, password)
-navigate(from, { replace: true })
-
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
+      navigate(from, { replace: true })
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   const loginGoogle = async () => {
-    const provider = new GoogleAuthProvider()
-   await signInWithPopup(auth, googleProvider)
-navigate(from, { replace: true })
-
+    try {
+      await signInWithPopup(auth, googleProvider)
+      navigate(from, { replace: true })
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   return (
@@ -46,11 +50,17 @@ navigate(from, { replace: true })
           onChange={e => setPassword(e.target.value)}
         />
 
-        <button onClick={loginEmail} className="w-full bg-blue-600 text-white p-2">
+        <button
+          onClick={loginEmail}
+          className="w-full bg-blue-600 text-white p-2"
+        >
           Login
         </button>
 
-        <button onClick={loginGoogle} className="w-full border p-2">
+        <button
+          onClick={loginGoogle}
+          className="w-full border p-2"
+        >
           Login with Google
         </button>
       </div>

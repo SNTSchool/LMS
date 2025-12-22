@@ -1,9 +1,10 @@
+// src/routes/AuthProvider.jsx
 import { createContext, useContext, useEffect, useState } from 'react'
-import { getAuth, onAuthStateChanged } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from '../firebaseConfig'
+import { onAuthStateChanged } from 'firebase/auth'
+import { auth } from '../firebase'
+import apiFetch from '../api/apiFetch'
 
-const AuthContext = createContext(null)
+const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -11,20 +12,29 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const auth = getAuth()
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        setUser(null)
+        setUserData(null)
+        setLoading(false)
+        return
+      }
 
-    return onAuthStateChanged(auth, async (u) => {
-      setUser(u)
+      setUser(firebaseUser)
 
-      if (u) {
-        const snap = await getDoc(doc(db, 'users', u.uid))
-        setUserData(snap.exists() ? snap.data() : { role: 'student' })
-      } else {
+      try {
+        // ดึง role จาก backend
+        const me = await apiFetch('/api/me')
+        setUserData(me)
+      } catch (err) {
+        console.error('load userData error', err)
         setUserData(null)
       }
 
       setLoading(false)
     })
+
+    return () => unsub()
   }, [])
 
   return (
@@ -34,4 +44,6 @@ export function AuthProvider({ children }) {
   )
 }
 
-export const useAuth = () => useContext(AuthContext)
+export function useAuth() {
+  return useContext(AuthContext)
+}

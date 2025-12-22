@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
-import { db } from '../firebase'
+import { db } from '../firebaseConfig'
 
 const AuthContext = createContext(null)
 
@@ -12,14 +12,17 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const auth = getAuth()
+
     return onAuthStateChanged(auth, async (u) => {
       setUser(u)
+
       if (u) {
         const snap = await getDoc(doc(db, 'users', u.uid))
         setUserData(snap.exists() ? snap.data() : { role: 'student' })
       } else {
         setUserData(null)
       }
+
       setLoading(false)
     })
   }, [])

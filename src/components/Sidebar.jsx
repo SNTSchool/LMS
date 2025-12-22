@@ -1,7 +1,7 @@
 // src/components/Sidebar.jsx
 import { Link, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
-import { auth } from '../firebase'
+import { auth } from '../firebaseConfig'
 import { useAuth } from '../routes/AuthProvider'
 
 export default function Sidebar() {

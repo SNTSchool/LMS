@@ -1,50 +1,34 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
-import { initializeApp } from 'firebase/app'
-
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-}
-
-const app = initializeApp(firebaseConfig)
-const auth = getAuth(app)
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '../firebase'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  const [userData, setUserData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser)
+    const auth = getAuth()
+    return onAuthStateChanged(auth, async (u) => {
+      setUser(u)
+      if (u) {
+        const snap = await getDoc(doc(db, 'users', u.uid))
+        setUserData(snap.exists() ? snap.data() : { role: 'student' })
+      } else {
+        setUserData(null)
+      }
       setLoading(false)
     })
-
-    const timeout = setTimeout(() => {
-      setLoading(false)
-    }, 1500)
-
-    return () => {
-      unsub()
-      clearTimeout(timeout)
-    }
   }, [])
 
   return (
-    <AuthContext.Provider
-      value={{ user, loading, isAuthenticated: !!user }}
-    >
-      {loading ? <div>Loading...</div> : children}
+    <AuthContext.Provider value={{ user, userData, loading }}>
+      {children}
     </AuthContext.Provider>
   )
 }
 
-export function useAuth() {
-  return useContext(AuthContext)
-}
+export const useAuth = () => useContext(AuthContext)

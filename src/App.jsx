@@ -1,10 +1,11 @@
-import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './routes/AuthProvider'
+import MainLayout from './layouts/MainLayout'
 
 import Login from './pages/Login'
 import Classes from './pages/Classes'
 import Classroom from './pages/Classroom'
+import Assignments from './pages/Assignments'
 import NotFound from './pages/NotFound'
 
 export default function App() {
@@ -16,19 +17,54 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
 
+      {user && (
+        <Route
+          path="/"
+          element={
+            <MainLayout>
+              <Classes />
+            </MainLayout>
+          }
+        />
+      )}
+
       <Route
         path="/classes"
-        element={user ? <Classes /> : <Navigate to="/login" />}
+        element={
+          user ? (
+            <MainLayout>
+              <Classes />
+            </MainLayout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
       />
 
       <Route
         path="/classes/:id"
-        element={user ? <Classroom /> : <Navigate to="/login" />}
+        element={
+          user ? (
+            <MainLayout>
+              <Classroom />
+            </MainLayout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
       />
 
       <Route
-        path="/"
-        element={<Navigate to={user ? '/classes' : '/login'} />}
+        path="/assignments"
+        element={
+          user ? (
+            <MainLayout>
+              <Assignments />
+            </MainLayout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
       />
 
       <Route path="*" element={<NotFound />} />

@@ -1,7 +1,12 @@
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { auth } from '../firebase'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+
+const location = useLocation()
+const navigate = useNavigate()
+const from = location.state?.from?.pathname || '/classes'
+
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -9,14 +14,16 @@ export default function Login() {
   const navigate = useNavigate()
 
   const loginEmail = async () => {
-    await signInWithEmailAndPassword(auth, email, password)
-    navigate('/')
+   await signInWithEmailAndPassword(auth, email, password)
+navigate(from, { replace: true })
+
   }
 
   const loginGoogle = async () => {
     const provider = new GoogleAuthProvider()
-    await signInWithPopup(auth, provider)
-    navigate('/')
+   await signInWithPopup(auth, googleProvider)
+navigate(from, { replace: true })
+
   }
 
   return (

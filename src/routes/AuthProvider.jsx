@@ -2,10 +2,6 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { initializeApp } from 'firebase/app'
 
-/**
- * ⚠️ สมมติว่าคุณมี firebase config อยู่แล้ว
- * ถ้ามีไฟล์ config แยก ให้ import มาแทนได้
- */
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -25,23 +21,26 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser)
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    const timeout = setTimeout(() => {
+      setLoading(false)
+    }, 1500)
+
+    return () => {
+      unsub()
+      clearTimeout(timeout)
+    }
   }, [])
 
-  const value = {
-    user,
-    loading,
-    isAuthenticated: !!user
-  }
-
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider
+      value={{ user, loading, isAuthenticated: !!user }}
+    >
+      {loading ? <div>Loading...</div> : children}
     </AuthContext.Provider>
   )
 }

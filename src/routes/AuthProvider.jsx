@@ -1,75 +1,51 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
-import { auth, db } from '../firebaseConfig'
-import Swal from 'sweetalert2'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import { initializeApp } from 'firebase/app'
 
-const AuthContext = createContext()
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> parent of 21902be (Update AuthProvider.jsx)
-=======
->>>>>>> parent of 21902be (Update AuthProvider.jsx)
-const value = {
-  user,
-  userData, // { role, name, ... }
-  loading
+/**
+ * ⚠️ สมมติว่าคุณมี firebase config อยู่แล้ว
+ * ถ้ามีไฟล์ config แยก ให้ import มาแทนได้
+ */
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 }
 
+const app = initializeApp(firebaseConfig)
+const auth = getAuth(app)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> parent of 21902be (Update AuthProvider.jsx)
-=======
->>>>>>> parent of 21902be (Update AuthProvider.jsx)
-=======
->>>>>>> parent of 21902be (Update AuthProvider.jsx)
-export const useAuth = () => useContext(AuthContext)
+const AuthContext = createContext(null)
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [userData, setUserData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u)
-
-      if (u) {
-        try {
-          const snap = await getDoc(doc(db, 'users', u.uid))
-          if (!snap.exists()) {
-            Swal.fire({
-              icon: 'error',
-              title: 'ไม่มีสิทธิ์เข้าใช้งาน',
-              text: 'บัญชีนี้ยังไม่ถูกสร้างในระบบ'
-            })
-            await auth.signOut()
-            return
-          }
-          setUserData(snap.data())
-        } catch (err) {
-          Swal.fire({
-            icon: 'error',
-            title: 'โหลดข้อมูลผู้ใช้ไม่สำเร็จ',
-            text: err.message
-          })
-        }
-      } else {
-        setUserData(null)
-      }
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser)
       setLoading(false)
     })
-    return () => unsub()
+
+    return () => unsubscribe()
   }, [])
 
+  const value = {
+    user,
+    loading,
+    isAuthenticated: !!user
+  }
+
   return (
-    <AuthContext.Provider value={{ user, userData, loading }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   )
+}
+
+export function useAuth() {
+  return useContext(AuthContext)
 }

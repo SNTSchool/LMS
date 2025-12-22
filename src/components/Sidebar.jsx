@@ -1,33 +1,44 @@
 // src/components/Sidebar.jsx
-import { NavLink } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { signOut } from 'firebase/auth'
+import { auth } from '../firebase'
+import { useAuth } from '../routes/AuthProvider'
 
 export default function Sidebar() {
+  const { user, userData, loading } = useAuth()
+  const navigate = useNavigate()
+
+  if (loading) return null
+  if (!user) return null
+
+  const role = userData?.role
+
+  const logout = async () => {
+    await signOut(auth)
+    navigate('/login')
+  }
+
   return (
-    <aside className="w-64 bg-white border-r h-full">
-      <div className="p-4 font-bold text-lg">
+    <aside className="w-64 bg-gray-900 text-white min-h-screen p-4">
+      <h2 className="text-lg font-bold mb-4">
         Learning Management System
-      </div>
+      </h2>
 
-      <nav className="flex flex-col gap-1 px-2">
-        <NavLink to="/classes" className="p-2 rounded hover:bg-gray-100">
+      <nav className="space-y-2">
+        <Link to="/classes" className="block hover:bg-gray-700 p-2 rounded">
           ห้องเรียน
-        </NavLink>
+        </Link>
 
-        <NavLink to="/assignments" className="p-2 rounded hover:bg-gray-100">
-          งานทั้งหมด
-        </NavLink>
+        {(role === 'teacher' || role === 'admin') && (
+          <Link to="/classes/create" className="block hover:bg-gray-700 p-2 rounded">
+            สร้างห้องเรียน
+          </Link>
+        )}
 
-        <NavLink to="/drive" className="p-2 rounded hover:bg-gray-100">
-          ไฟล์ของฉัน
-        </NavLink>
-
-        <div className="border-t my-2" />
-
-        <NavLink to="/profile" className="p-2 rounded hover:bg-gray-100">
-          โปรไฟล์
-        </NavLink>
-
-        <button className="p-2 text-left rounded hover:bg-red-100 text-red-600">
+        <button
+          onClick={logout}
+          className="w-full text-left hover:bg-red-700 p-2 rounded mt-6"
+        >
           ออกจากระบบ
         </button>
       </nav>

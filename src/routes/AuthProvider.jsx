@@ -1,4 +1,6 @@
 // src/routes/AuthProvider.jsx
+import React from 'react'
+
 import { createContext, useContext, useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '../firebaseConfig'

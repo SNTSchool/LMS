@@ -37,9 +37,9 @@ const auth = adminInited ? admin.auth() : null
 
 // Google Drive via service account (optional)
 let driveClient = null
-if (process.env.GOOGLE_SERVICE_ACCOUNT) {
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
-    const gsa = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT)
+    const gsa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
     const jwtClient = new google.auth.JWT({
       email: gsa.client_email,
       key: gsa.private_key,

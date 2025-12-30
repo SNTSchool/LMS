@@ -1,11 +1,12 @@
 import { auth } from '../firebase'
+const BASE = import.meta.env.VITE_API_URL || '' // if blank, relative /api
 
-export default async function apiFetch(url, options = {}) {
+export default async function apiFetch(path, options = {}) {
   const user = auth.currentUser
+  const headers = { ...(options.headers || {}) }
 
-  const headers = {
-    ...(options.headers || {}),
-    'Content-Type': 'application/json'
+  if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json'
   }
 
   if (user) {
@@ -13,18 +14,12 @@ export default async function apiFetch(url, options = {}) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const res = await fetch(
-    import.meta.env.VITE_API_BASE_URL + url,
-    {
-      ...options,
-      headers
-    }
-  )
-
+  const res = await fetch(BASE + path, { ...options, headers })
   if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || res.statusText)
+    const txt = await res.text()
+    throw new Error(txt || res.statusText)
   }
-
-  return res.json()
+  const ct = res.headers.get('content-type') || ''
+  if (ct.includes('application/json')) return res.json()
+  return res.text()
 }

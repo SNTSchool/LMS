@@ -5,8 +5,12 @@ import { auth } from '../firebase'
 import { useAuth } from '../routes/AuthProvider'
 
 export default function Sidebar() {
-  const { user } = useAuth()
+  const { user, userData, loading } = useAuth()
   const navigate = useNavigate()
+
+  if (loading) return null
+
+  const role = (userData && userData.role) ? userData.role : 'student'
 
   const handleLogout = async () => {
     await signOut(auth)
@@ -20,9 +24,16 @@ export default function Sidebar() {
         <Link to="/classes" className="block p-2 rounded hover:bg-green-800">Classes</Link>
         <Link to="/assignments" className="block p-2 rounded hover:bg-green-800">Assignments</Link>
         <Link to="/reports" className="block p-2 rounded hover:bg-green-800">Reports</Link>
+
+        {['teacher','admin'].includes(role) && (
+          <>
+            <Link to="/create-class" className="block p-2 rounded hover:bg-green-800">Create Class</Link>
+          </>
+        )}
       </nav>
       <div className="mt-4">
         <div className="mb-2 text-sm truncate">{user?.email}</div>
+        <div className="mb-2 text-xs">{role}</div>
         <button onClick={handleLogout} className="w-full bg-red-600 p-2 rounded">Sign out</button>
       </div>
     </aside>

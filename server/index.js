@@ -127,28 +127,26 @@ app.post('/api/classes/join', verify, async (req,res)=> {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-app.get('/api/classes/:id', verify, async (req,res)=> {
+app.get('/api/classes/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params
-    if (!adminInited) {
-      return res.json({ klass: { id, name: 'Demo Class', code: 'DEMO01' }, assignments: [], sessions: [] })
+    const uid = req.user.uid
+    const doc = await db.collection('classes').doc(id).get()
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Class not found' })
     }
-    const cRef = db.collection('classes').doc(id)
-    const cSnap = await cRef.get()
-    if (!cSnap.exists) return res.status(404).json({ error:'Class not found' })
-    const c = cSnap.data()
-    const [assignSnap, filesSnap, sessSnap] = await Promise.all([
-      cRef.collection('assignments').orderBy('createdAt','desc').get(),
-      cRef.collection('files').orderBy('createdAt','desc').get(),
-      db.collection('attendance_sessions').where('classId','==',id).orderBy('createdAt','desc').get()
-    ])
+    const data = doc.data()
+    if (!data.members || !data.members.includes(uid)) {
+      return res.status(403).json({ error: 'No permission' })
+    }
     res.json({
-      klass: { id, ...c },
-      assignments: assignSnap.docs.map(d=>({ id:d.id, ...d.data() })),
-      files: filesSnap.docs.map(d=>({ id:d.id, ...d.data() })),
-      sessions: sessSnap.docs.map(d=>({ id:d.id, ...d.data() }))
+      id: doc.id,
+      ...data
     })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) {
+    console.error('GET /api/classes/:id error:', err)
+    res.status(500).json({ error: err.message })
+  }
 })
 
 /* --- Attendance sessions --- */

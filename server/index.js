@@ -7,6 +7,8 @@ import path from 'path'
 import fs from 'fs'
 import { google } from 'googleapis'
 import multer from 'multer'
+import { Readable } from 'stream'
+
 
 dotenv.config()
 
@@ -391,44 +393,63 @@ app.get('/api/assignments', verify, async (req, res) => {
    file upload -> drive, then record metadata
    expects multipart/form-data with 'file' and 'classId' (and optional fields)
 */
-app.post('/api/assignments/:assignmentId/submit', upload.single('file'), verify, async (req, res) => {
-  try {
-    const assignmentId = req.params.assignmentId
-    const classId = req.body.classId || req.query.classId
-    if (!req.file) return res.status(400).json({ error: 'Missing file' })
-    if (!driveClient) return res.status(400).json({ error: 'Drive not configured' })
+app.post(
+  '/api/assignments/:assignmentId/submit',
+  verify,
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const { assignmentId } = req.params
+      const { classId } = req.body
 
-    // upload to Drive
-    const parent = process.env.DRIVE_PARENT_FOLDER_ID || null
-    const mimeType = req.file.mimetype || 'application/octet-stream'
-    const driveRes = await driveClient.files.create({
-      requestBody: {
-        name: req.file.originalname,
-        parents: parent ? [parent] : undefined
-      },
-      media: {
-        mimeType,
-        body: Buffer.from(req.file.buffer)
+      if (!req.file) {
+        return res.status(400).json({ error: 'Missing file' })
       }
-    })
-    const fileId = driveRes.data.id
 
-    if (adminInited) {
-      await db.collection('classes').doc(classId).collection('assignments').doc(assignmentId)
-        .collection('submissions').add({
+      if (!driveClient) {
+        return res.status(500).json({ error: 'Drive not configured' })
+      }
+
+      const stream = new Readable()
+      stream.push(req.file.buffer)
+      stream.push(null)
+
+      const driveRes = await driveClient.files.create({
+        requestBody: {
+          name: req.file.originalname,
+          parents: process.env.DRIVE_PARENT_FOLDER_ID
+            ? [process.env.DRIVE_PARENT_FOLDER_ID]
+            : undefined
+        },
+        media: {
+          mimeType: req.file.mimetype,
+          body: stream
+        }
+      })
+
+      const fileId = driveRes.data.id
+
+      await db
+        .collection('classes')
+        .doc(classId)
+        .collection('assignments')
+        .doc(assignmentId)
+        .collection('submissions')
+        .add({
           uid: req.user.uid,
           fileId,
           fileName: req.file.originalname,
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         })
-    }
 
-    return res.json({ ok: true, fileId })
-  } catch (err) {
-    console.error('POST /api/assignments/:assignmentId/submit error:', err)
-    return res.status(500).json({ error: err.message })
+      res.json({ ok: true, fileId })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
   }
-})
+)
+
 
 /* POST /api/reports
    Upload report (duty) to Drive and save metadata to 'reports' collection.

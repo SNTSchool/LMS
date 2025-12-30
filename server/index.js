@@ -63,14 +63,30 @@ function genCode(len=6){
   return s
 }
 
-app.get('/api/classes', verify, async (req,res)=> {
+app.get('/api/classes', verify, async (req, res) => {
   try {
-    if (!adminInited) return res.json([]) // dev
     const uid = req.user.uid
-    const snap = await db.collection('classes').where('members','array-contains',uid).orderBy('createdAt','desc').get()
-    res.json(snap.docs.map(d=>({ id:d.id, ...d.data() })))
-  } catch (err){ res.status(500).json({ error: err.message }) }
+
+    const snap = await db
+      .collection('classes')
+      .where('members', 'array-contains', uid)
+      .get()
+
+    const classes = snap.docs
+      .map(d => ({
+        id: d.id,
+        ...d.data()
+      }))
+      // sort เองใน server
+      .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis())
+
+    res.json(classes)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
 })
+
 
 app.post('/api/classes', verify, async (req,res)=> {
   try {

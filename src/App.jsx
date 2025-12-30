@@ -1,47 +1,32 @@
+import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Classes from './pages/Classes'
 import Classroom from './pages/Classroom'
-import ProtectedRoute from './routes/ProtectedRoute'
+import Assignments from './pages/Assignments'
+import AssignmentDetail from './pages/AssignmentDetail'
+import Reports from './pages/Reports'
 import { useAuth } from './routes/AuthProvider'
-
-function HomeRedirect() {
-  const { user, loading } = useAuth()
-
-  if (loading) return null
-
-  return user
-    ? <Navigate to="/classes" replace />
-    : <Navigate to="/login" replace />
-}
+import ProtectedRoute from './routes/ProtectedRoute'
 
 export default function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+
   return (
     <Routes>
-      {/* ✅ root */}
-      <Route path="/" element={<HomeRedirect />} />
-
       <Route path="/login" element={<Login />} />
+      <Route path="/classes" element={<ProtectedRoute><Classes /></ProtectedRoute>} />
+      <Route path="/classes/:id" element={<ProtectedRoute><Classroom /></ProtectedRoute>} />
 
-      <Route
-        path="/classes"
-        element={
-          <ProtectedRoute>
-            <Classes />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/assignments" element={<ProtectedRoute><Assignments /></ProtectedRoute>} />
+      <Route path="/assignments/:classId/:assignmentId" element={<ProtectedRoute><AssignmentDetail /></ProtectedRoute>} />
 
-      <Route
-        path="/classes/:id"
-        element={
-          <ProtectedRoute>
-            <Classroom />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
 
-      {/* ❌ ยังไม่ต้องใส่ * */}
+      <Route path="/" element={<Navigate to={user ? '/classes' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={user ? '/classes' : '/login'} replace />} />
     </Routes>
   )
 }

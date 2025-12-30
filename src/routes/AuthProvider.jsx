@@ -1,8 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
-import { auth, db } from '../firebase' // IMPORTANT: firebase should export firestore db too
+import { auth, db } from '../firebase'
+import { doc, getDoc } from 'firebase/firestore'
 
-const AuthContext = createContext({ user: null, userData: null, loading: true })
+const AuthContext = createContext({
+  user: null,
+  userData: null,
+  loading: true
+})
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -12,23 +17,30 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u)
+
       if (!u) {
         setUserData(null)
         setLoading(false)
         return
       }
+
       try {
-        // read users/{uid} doc (role, displayName, etc.)
-        const doc = await db.collection('users').doc(u.uid).get()
-        if (doc.exists) setUserData(doc.data())
-        else setUserData(null)
+        const ref = doc(db, 'users', u.uid)
+        const snap = await getDoc(ref)
+
+        if (snap.exists()) {
+          setUserData(snap.data()) // <-- role จะมาจากตรงนี้
+        } else {
+          setUserData({ role: 'student' })
+        }
       } catch (err) {
-        console.error('Failed to load userData', err)
-        setUserData(null)
+        console.error('load userData error', err)
+        setUserData({ role: 'student' })
       } finally {
         setLoading(false)
       }
     })
+
     return () => unsub()
   }, [])
 
@@ -38,4 +50,5 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   )
 }
+
 export const useAuth = () => useContext(AuthContext)

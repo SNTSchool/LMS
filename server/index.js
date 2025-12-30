@@ -414,18 +414,18 @@ app.post(
       stream.push(req.file.buffer)
       stream.push(null)
 
+      
       const driveRes = await driveClient.files.create({
-        requestBody: {
-          name: req.file.originalname,
-          parents: process.env.DRIVE_PARENT_FOLDER_ID
-            ? [process.env.DRIVE_PARENT_FOLDER_ID]
-            : undefined
-        },
-        media: {
-          mimeType: req.file.mimetype,
-          body: stream
-        }
-      })
+  requestBody: {
+    name: req.file.originalname,
+    parents: [process.env.DRIVE_SHARED_DRIVE_ID]
+  },
+  media: {
+    mimeType: req.file.mimetype,
+    body: Readable.from(req.file.buffer)
+  },
+  supportsAllDrives: true   // ⭐ สำคัญ
+})
 
       const fileId = driveRes.data.id
 
@@ -469,12 +469,16 @@ app.post('/api/reports', upload.single('file'), verify, async (req, res) => {
     const mimeType = req.file.mimetype || 'application/octet-stream'
     const parent = process.env.DRIVE_PARENT_FOLDER_ID || null
     const driveRes = await driveClient.files.create({
-      requestBody: {
-        name: req.file.originalname,
-        parents: parent ? [parent] : undefined
-      },
-      media: { mimeType, body: Buffer.from(req.file.buffer) }
-    })
+  requestBody: {
+    name: req.file.originalname,
+    parents: [process.env.DRIVE_SHARED_DRIVE_ID]
+  },
+  media: {
+    mimeType: req.file.mimetype,
+    body: Readable.from(req.file.buffer)
+  },
+  supportsAllDrives: true   // ⭐ สำคัญ
+})
 
     const fileId = driveRes.data.id
 
